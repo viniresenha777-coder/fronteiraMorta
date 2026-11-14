@@ -329,7 +329,7 @@ function gfxMask(lx, ly) {
     if (!inView(b.x, b.y, b.w, b.h, 260)) continue;
     const x = b.x - cam.x, y = b.y - cam.y;
     if (lx > x - 2 && lx < x + b.w + 2 && ly > y - 2 && ly < y + b.h + 2) continue;
-    rects.push([x, y, b.w, b.h]);
+    rects.push([x, y, b.w, b.h, b]);
     const P = [[x, y], [x + b.w, y], [x + b.w, y + b.h], [x, y + b.h]];
     for (let i = 0; i < 4; i++) {
       const a = P[i], c = P[(i + 1) % 4];
@@ -341,7 +341,20 @@ function gfxMask(lx, ly) {
     }
   }
   m.fillStyle = "#fff";
-  for (const r of rects) m.fillRect(r[0], r[1], r[2], r[3]);
+  for (const r of rects) {
+    m.fillRect(r[0], r[1], r[2], r[3]);
+    // câmera em perspectiva: o telhado e as paredes do prédio ficam claros (fora da sombra)
+    if (typeof bHeight === "function") {
+      const b = r[4], ex = W / 2, ey = H / 2, k = CAM_H / (CAM_H - bHeight(b));
+      const P = [[r[0], r[1]], [r[0] + r[2], r[1]], [r[0] + r[2], r[1] + r[3]], [r[0], r[1] + r[3]]];
+      const T = P.map(([px, py]) => [ex + (px - ex) * k, ey + (py - ey) * k]);
+      for (let i = 0; i < 4; i++) {
+        const a = P[i], c = P[(i + 1) % 4], ta = T[i], tc = T[(i + 1) % 4];
+        m.beginPath(); m.moveTo(a[0], a[1]); m.lineTo(c[0], c[1]); m.lineTo(tc[0], tc[1]); m.lineTo(ta[0], ta[1]); m.closePath(); m.fill();
+      }
+      m.beginPath(); m.moveTo(T[0][0], T[0][1]); for (let i = 1; i < 4; i++) m.lineTo(T[i][0], T[i][1]); m.closePath(); m.fill();
+    }
+  }
 }
 
 // ---------- Quadro final ----------

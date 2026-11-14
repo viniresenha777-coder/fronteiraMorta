@@ -108,7 +108,7 @@ function drawWorld() {
   for (const c of world.corpses) if (inView(c.x, c.y, c.w, c.h, 20)) drawCorpse(c);
   for (const c of world.cars) if (inView(c.x, c.y, c.w, c.h, 20)) { carUnder(c); drawCar(c); carOver(c); }
   for (const o of world.bodies) if (inView(o.x, o.y, o.w, o.h, 20)) drawBody(o);
-  for (const b of world.buildings) if (inView(b.x, b.y, b.w, b.h, 20)) drawBuilding(b);
+  for (const b of world.buildings) if (inView(b.x, b.y, b.w, b.h, 20)) drawBuildingGround(b); // paredes e telhado: drawTall()
   drawAreaEdges();
 }
 // bordas da área: com passagem mostram a cor e o nome da vizinha; sem passagem, escombros

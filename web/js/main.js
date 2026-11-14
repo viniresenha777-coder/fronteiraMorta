@@ -269,7 +269,7 @@ function draw() {
   drawProjectiles();
   if (game.escort && !game.over) drawSurvivor(game.escort.x, game.escort.y, game.escort.ang, game.escort.walk, game.escort.moving);
   if (!game.over) drawPlayer();
-  if (!game.inside) { drawCanopies(); drawSmoke(); }
+  if (!game.inside) { drawTall(); drawCanopiesP(); drawSmoke(); } // câmera aérea com perspectiva
   ctx.restore();
   if (GFX.on) {
     // luz, sombras, clima e efeitos no WebGL; o HUD vai na tela de cima (transparente)
