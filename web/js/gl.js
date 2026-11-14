@@ -285,7 +285,7 @@ function gfxLights(dark) {
   if (!game.over) {
     const px = player.x - ox, py = player.y - oy, a = player.angle;
     add(px, py, game.inside ? 240 : 150, dark * 1.05, [1, 0.96, 0.9], true);
-    if (dark > 0.22) add(px, py, 440, (dark - 0.18) * 1.6, [1, 0.94, 0.8], true, [Math.cos(a), Math.sin(a), Math.cos(0.5), 0.14]);
+    if (dark > 0.12) add(px, py, 460, (dark - 0.08) * 1.7, [1, 0.86, 0.55], true, [Math.cos(a), Math.sin(a), Math.cos(0.5), 0.14]); // lanterna amarelada
     if (player.flashT > 0) add(px + Math.cos(a) * 30, py + Math.sin(a) * 30, 280, 1.1 * glow * (Math.min(1, player.flashT / 60) + 0.4), [1, 0.75, 0.38], true);
   }
   for (const f of game.flashes) {
@@ -347,7 +347,7 @@ function gfxMask(lx, ly) {
     if (typeof bHeight === "function") {
       const b = r[4], ex = W / 2, ey = H / 2, k = CAM_H / (CAM_H - bHeight(b));
       const P = [[r[0], r[1]], [r[0] + r[2], r[1]], [r[0] + r[2], r[1] + r[3]], [r[0], r[1] + r[3]]];
-      const T = P.map(([px, py]) => [ex + (px - ex) * k, ey + (py - ey) * k]);
+      const hb = bHeight(b), T = P.map(([px, py]) => [ex + (px - ex) * k, ey + (py - ey) * k - hb * LEAN]);
       for (let i = 0; i < 4; i++) {
         const a = P[i], c = P[(i + 1) % 4], ta = T[i], tc = T[(i + 1) % 4];
         m.beginPath(); m.moveTo(a[0], a[1]); m.lineTo(c[0], c[1]); m.lineTo(tc[0], tc[1]); m.lineTo(ta[0], ta[1]); m.closePath(); m.fill();

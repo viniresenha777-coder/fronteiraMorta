@@ -226,6 +226,7 @@ function drawPause() {
   txt(`${playerName()}${prof() ? ` · ${prof().name}` : ""}`, W / 2, 124, 14, "#ffd96a", "center", true);
   btn(W / 2 - 280, 290, 160, 34, "Trocar nome", () => { game.paused = false; openNameScreen(true); });
   btn(W / 2 - 280, 170, 160, 42, "Salvar progresso", manualSave);
+  btn(W / 2 - 280, 92, 160, 30, `Boneco: ${save.classicChar ? "clássico" : "novo"}`, () => { save.classicChar = !save.classicChar; persist(); });
   const ago = game.lastSave ? Math.round((performance.now() - game.lastSave) / 1000) : null;
   txt(ago == null ? "ainda não salvou nesta sessão" : ago < 3 ? "salvo agora!" : `último checkpoint: há ${ago < 60 ? `${ago}s` : `${Math.floor(ago / 60)} min`}`, W / 2 - 200, 164, 10, ago != null && ago < 3 ? "#8fe08a" : "rgba(229,224,200,0.55)", "center");
   btn(W / 2 - 130, 518, 260, 42, NATIVE ? "Salvar e sair do jogo" : "Salvar e sair", saveAndQuit, true);

@@ -35,6 +35,27 @@ function sparkle(x, y) {
 }
 
 // ---------- Texturas ----------
+// cerâmica azul: rejunte escuro, peças com tons diferentes, rachaduras e folhas secas
+function blueTiles(step) {
+  return (g, size) => {
+    for (let y = 0; y < size; y += step) for (let x = 0; x < size; x += step) {
+      g.fillStyle = `rgba(${Math.random() < 0.5 ? "255,255,255" : "0,0,0"},${(Math.random() * 0.07).toFixed(3)})`; g.fillRect(x, y, step, step);
+    }
+    g.strokeStyle = "rgba(10,18,28,0.55)"; g.lineWidth = 2;
+    for (let i = 0; i <= size; i += step) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, size); g.moveTo(0, i); g.lineTo(size, i); g.stroke(); }
+    g.strokeStyle = "rgba(8,14,22,0.6)"; g.lineWidth = 1;
+    for (let c = 0; c < 6; c++) {
+      let x = Math.random() * size, y = Math.random() * size; g.beginPath(); g.moveTo(x, y);
+      for (let k = 0; k < 4; k++) { x += (Math.random() - 0.5) * 22; y += (Math.random() - 0.5) * 22; g.lineTo(x, y); }
+      g.stroke();
+    }
+    for (let i = 0; i < 9; i++) {
+      g.fillStyle = ["rgba(150,80,40,0.75)", "rgba(120,60,30,0.7)", "rgba(170,110,50,0.65)"][i % 3];
+      g.save(); g.translate(Math.random() * size, Math.random() * size); g.rotate(Math.random() * 6.28);
+      g.beginPath(); g.ellipse(0, 0, 3.2, 1.6, 0, 0, 6.283); g.fill(); g.restore();
+    }
+  };
+}
 function tex(size, base, specks, extra) {
   const c = document.createElement("canvas"); c.width = c.height = size;
   const g = c.getContext("2d");
@@ -56,11 +77,12 @@ function initRender() {
   const P = (c) => ctx.createPattern(c, "repeat");
   PAT.asphalt = P(tex(256, "#2e3034", [["rgba(255,255,255,0.045)", 1100, 1, 2], ["rgba(0,0,0,0.28)", 800, 1, 3], ["rgba(255,255,255,0.03)", 40, 4, 9]]));
   PAT.lot = P(tex(256, "#393a3e", [["rgba(255,255,255,0.05)", 900, 1, 2], ["rgba(0,0,0,0.25)", 700, 1, 3]]));
-  PAT.sidewalk = P(tex(96, "#75736a", [["rgba(0,0,0,0.12)", 260, 1, 2], ["rgba(255,255,255,0.07)", 160, 1, 2]], gridLines(48, "rgba(0,0,0,0.22)")));
+  // calçada de cerâmica azul-acinzentada, rachada e com folhas secas
+  PAT.sidewalk = P(tex(192, "#3f5468", [["rgba(0,0,0,0.12)", 500, 1, 2], ["rgba(150,180,210,0.07)", 300, 1, 2]], blueTiles(48)));
   PAT.grass = P(tex(256, "#34432a", [["rgba(90,120,55,0.35)", 1600, 1, 2], ["rgba(15,25,10,0.35)", 900, 1, 3], ["rgba(140,150,80,0.15)", 180, 2, 3]]));
   PAT.park = P(tex(256, "#2f4a28", [["rgba(90,140,60,0.35)", 1800, 1, 2], ["rgba(10,25,10,0.35)", 900, 1, 3], ["rgba(220,210,90,0.14)", 70, 2, 3]]));
   PAT.dirt = P(tex(256, "#4a4636", [["rgba(0,0,0,0.2)", 900, 1, 3], ["rgba(255,240,200,0.06)", 500, 1, 2], ["rgba(70,90,40,0.25)", 300, 1, 3]]));
-  PAT.plaza = P(tex(128, "#5d5c55", [["rgba(0,0,0,0.12)", 300, 1, 2], ["rgba(255,255,255,0.05)", 200, 1, 2]], gridLines(32, "rgba(0,0,0,0.18)")));
+  PAT.plaza = P(tex(192, "#46596b", [["rgba(0,0,0,0.12)", 500, 1, 2], ["rgba(150,180,210,0.06)", 300, 1, 2]], blueTiles(32)));
   PAT.gravel = P(tex(128, "#4c4d4a", [["rgba(0,0,0,0.25)", 900, 1, 2], ["rgba(255,255,255,0.08)", 600, 1, 2]]));
   PAT.wood = P(tex(128, "#5e4630", [["rgba(0,0,0,0.12)", 300, 1, 2]], (g, s) => {
     for (let y = 0; y < s; y += 16) {
@@ -312,20 +334,20 @@ function drawBuilding(b) {
   drawDoor(b);
 }
 function drawPitched(b) {
-  const horiz = b.w >= b.h, L = horiz ? b.w : b.h, S = horiz ? b.h : b.w;
+  const horiz = b.w >= b.h, L = horiz ? b.w : b.h, S = horiz ? b.h : b.w, rc = typeof roofColor === "function" ? roofColor(b) : b.color;
   ctx.save(); ctx.translate(b.x + b.w / 2, b.y + b.h / 2); if (!horiz) ctx.rotate(Math.PI / 2);
   const hl = L / 2, hs = S / 2, inset = Math.min(hs, hl * 0.6);
-  poly([[-hl, -hs], [hl, -hs], [hl - inset, 0], [-hl + inset, 0]], shade(b.color, 0.14));
-  poly([[-hl, hs], [hl, hs], [hl - inset, 0], [-hl + inset, 0]], shade(b.color, -0.24));
-  poly([[-hl, -hs], [-hl + inset, 0], [-hl, hs]], shade(b.color, -0.06));
-  poly([[hl, -hs], [hl - inset, 0], [hl, hs]], shade(b.color, 0.04));
-  ctx.strokeStyle = "rgba(0,0,0,0.13)"; ctx.lineWidth = 1;
+  poly([[-hl, -hs], [hl, -hs], [hl - inset, 0], [-hl + inset, 0]], shade(rc, 0.14));
+  poly([[-hl, hs], [hl, hs], [hl - inset, 0], [-hl + inset, 0]], shade(rc, -0.24));
+  poly([[-hl, -hs], [-hl + inset, 0], [-hl, hs]], shade(rc, -0.06));
+  poly([[hl, -hs], [hl - inset, 0], [hl, hs]], shade(rc, 0.04));
+  ctx.strokeStyle = "rgba(60,20,8,0.28)"; ctx.lineWidth = 1;
   for (let y = -hs + 7; y < hs; y += 7) {
     if (Math.abs(y) < 3) continue;
     const xe = hl - inset * (1 - Math.abs(y) / hs);
     ctx.beginPath(); ctx.moveTo(-xe, y); ctx.lineTo(xe, y); ctx.stroke();
   }
-  ctx.strokeStyle = shade(b.color, -0.45); ctx.lineWidth = 2.5;
+  ctx.strokeStyle = shade(rc, -0.45); ctx.lineWidth = 2.5;
   ctx.beginPath();
   ctx.moveTo(-hl + inset, 0); ctx.lineTo(hl - inset, 0);
   ctx.moveTo(-hl, -hs); ctx.lineTo(-hl + inset, 0); ctx.lineTo(-hl, hs);
@@ -1134,7 +1156,7 @@ function drawHUD() {
   const compact = save.hud === 1;
   ctx.globalAlpha = 1;
   // nome em cima do personagem
-  if (!game.over) hudT(playerName(), player.x - cam.x, player.y - cam.y - 28, 10, "#8fe08a", "center", true);
+  if (!game.over) hudT(playerName(), player.x - cam.x, player.y - cam.y - (useSpriteChar() ? 64 : 28), 10, "#8fe08a", "center", true);
   // prédio do resgate: "SOS" piscando em cima do telhado (por cima da luz)
   const rb = !game.inside && rescueBuilding();
   if (rb) {
@@ -1221,12 +1243,12 @@ function drawHUD() {
     ctx.fillStyle = "#ffd96a"; ctx.fillRect(122, H - 38, 90 * (1 - player.reloading / (player.reloadMax || 1)), 4);
   } else if (w.infinite && player.spin > 0) { ctx.fillStyle = "#e0c341"; ctx.fillRect(122, H - 38, 90 * player.spin, 4); }
 
-  // ---- baixo direito: últimas mensagens ----
+  // ---- baixo esquerdo (acima das armas): últimas mensagens ----
   const log = (game.log || []).filter((m) => game.time - m.at < 7000 || performance.now() - m.real < 7000).slice(-5);
   log.forEach((m, i) => {
     const age = performance.now() - m.real;
     ctx.globalAlpha = clamp((7000 - age) / 800, 0, 1);
-    hudT(m.text, W - 14, H - 14 - (log.length - 1 - i) * 16, 11, "#e0c060", "right", true, 380);
+    hudT(m.text, 12, H - 108 - (log.length - 1 - i) * 15, 11, "#e8c84a", "left", true, 420);
   });
   ctx.globalAlpha = 1;
 

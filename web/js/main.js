@@ -163,6 +163,7 @@ function update(dt) {
     player.moveAng = Math.atan2(dy, dx);
     const len = Math.hypot(dx, dy), sp = (sprinting ? 5.2 * (1 + profVal("sprint")) : player.speed) * (1 + player.fx.agility / 100) * (1 + (A("agi") - 10) * 0.004) * (1 - slow / 100);
     player.x += (dx / len) * sp * k; player.y += (dy / len) * sp * k;
+    player.animT = (player.animT || 0) + dt;
     if (!game.inside) save.stats.dist = S("dist") + sp * k;
     player.walk += sp * k * 0.16;
     if (sprinting && Math.random() < dt / 70) dust(player.x - (dx / len) * 8, player.y - (dy / len) * 8);
@@ -268,7 +269,7 @@ function draw() {
   for (const z of Zs()) if (game.inside || inView(z.x - 40, z.y - 40, 80, 80)) { drawZombie(z); drawZombieExtra(z); }
   drawProjectiles();
   if (game.escort && !game.over) drawSurvivor(game.escort.x, game.escort.y, game.escort.ang, game.escort.walk, game.escort.moving);
-  if (!game.over) drawPlayer();
+  if (!game.over && !drawPlayerSprite()) drawPlayer(); // spritesheet de 8 direções (ou o boneco clássico)
   if (!game.inside) { drawTall(); drawCanopiesP(); drawSmoke(); } // câmera aérea com perspectiva
   ctx.restore();
   if (GFX.on) {
@@ -280,6 +281,7 @@ function draw() {
     drawLighting();
     drawScreenFx();
   }
+  drawAtmosphere(); // cone da lanterna, neblina azulada e vinheta
   // números de dano ficam acima da luz, sempre legíveis
   ctx.save();
   ctx.translate(-Math.round(cam.x) + shx, -Math.round(cam.y) + shy);

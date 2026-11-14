@@ -6,7 +6,7 @@
 const SAVE_KEY = "fronteira-morta";
 const save = {
   bank: 0, vault: [], installed: [], credits: 0, gm: false, missions: [],
-  vest: -1, outposts: OUTPOSTS.map((o, i) => i === 0), muted: false, hud: 0, skin: 0, cape: 0, prof: null, name: "", vestDur: {}, music: true, gfx: 2,
+  vest: -1, outposts: OUTPOSTS.map((o, i) => i === 0), muted: false, hud: 0, skin: 0, cape: 0, prof: null, name: "", classicChar: false, vestDur: {}, music: true, gfx: 2,
   stats: {}, story: 0, ach: {}, daily: null, coll: [], vestsOwned: VESTS.map(() => false), vestVer: 2,
   char: { level: 1, xp: 0, points: 0, wpoints: 0, attrs: defaultAttrs() }
 };
@@ -38,7 +38,7 @@ function loadSave() {
     save.vest = clamp(save.vest, -1, VESTS.length - 1);
     save.vestsOwned = VESTS.map((v, i) => !!(s.vestsOwned && s.vestsOwned[i]) || i === save.vest);
     save.outposts = OUTPOSTS.map((o, i) => i === 0 || !!(s.outposts && s.outposts[i]));
-    save.muted = !!s.muted; save.hud = s.hud === 1 ? 1 : 0; save.skin = clamp(s.skin | 0, 0, SKINS.length - 1); save.cape = clamp(s.cape | 0, 0, CAPES.length - 1); save.prof = typeof s.prof === "string" ? s.prof : null; save.name = typeof s.name === "string" ? s.name.slice(0, 16) : ""; save.vestDur = s.vestDur && typeof s.vestDur === "object" ? s.vestDur : {};
+    save.muted = !!s.muted; save.hud = s.hud === 1 ? 1 : 0; save.skin = clamp(s.skin | 0, 0, SKINS.length - 1); save.cape = clamp(s.cape | 0, 0, CAPES.length - 1); save.prof = typeof s.prof === "string" ? s.prof : null; save.name = typeof s.name === "string" ? s.name.slice(0, 16) : ""; save.classicChar = !!s.classicChar; save.vestDur = s.vestDur && typeof s.vestDur === "object" ? s.vestDur : {};
     save.music = s.music !== false;
     save.gfx = s.gfx === 0 || s.gfx === 1 ? s.gfx : 2;
     save.stats = s.stats && typeof s.stats === "object" ? s.stats : {};

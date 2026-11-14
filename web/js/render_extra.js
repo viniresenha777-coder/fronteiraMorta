@@ -281,7 +281,7 @@ function drawBonusPanel() {
   const list = activeBonuses();
   if (!list.length || save.hud === 1) return;
   // lista de bônus à esquerda, só texto, logo abaixo das informações do topo
-  const x = 12, h = 13, y0 = game.hudBonusY || 170, room = H - 110 - y0, max = Math.max(3, Math.floor(room / h));
+  const x = 12, h = 13, y0 = game.hudBonusY || 170, room = H - 196 - y0, max = Math.max(3, Math.floor(room / h));
   const rows = list.slice(0, max);
   let hover = null;
   ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.95)"; ctx.shadowBlur = 3; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
