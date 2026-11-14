@@ -14,11 +14,7 @@ namespace FronteiraMorta
         {
             var data = cam.GetUniversalAdditionalCameraData();
             if (data != null) { data.renderPostProcessing = true; data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing; }
-            if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urp)
-            {
-                urp.shadowDistance = 70f;
-                urp.msaaSampleCount = 4;
-            }
+            // (não mexe mais nas configurações do projeto: sombras e antisserrilhado ficam como estão)
 
             var go = new GameObject("PosProcessamento");
             var vol = go.AddComponent<Volume>();

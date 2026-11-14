@@ -13,19 +13,19 @@ namespace FronteiraMorta
         static readonly Dictionary<string, Material> cache = new Dictionary<string, Material>();
         static Shader lit, unlit;
 
-        static bool Urp => GraphicsSettings.currentRenderPipeline != null;
+        // Usa o shader do URP sempre que ele existir no projeto (não depende de perguntar qual
+        // pipeline está ativo, que às vezes ainda não responde no primeiro quadro e deixava tudo rosa).
+        public static bool Urp => Shader.Find("Universal Render Pipeline/Lit") != null;
 
-        static Shader LitShader()
+        public static Shader LitShader()
         {
-            if (lit == null) lit = Urp ? Shader.Find("Universal Render Pipeline/Lit") : Shader.Find("Standard");
-            if (lit == null) lit = Shader.Find("Standard");
+            if (lit == null) lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
             return lit;
         }
 
         static Shader UnlitShader()
         {
-            if (unlit == null) unlit = Urp ? Shader.Find("Universal Render Pipeline/Unlit") : Shader.Find("Unlit/Color");
-            if (unlit == null) unlit = Shader.Find("Sprites/Default");
+            if (unlit == null) unlit = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? Shader.Find("Sprites/Default");
             return unlit;
         }
 

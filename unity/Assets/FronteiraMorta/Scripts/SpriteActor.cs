@@ -40,8 +40,8 @@ namespace FronteiraMorta
         {
             if (mats.TryGetValue(name, out var m)) return m;
             var tex = Load(name);
-            bool urp = GraphicsSettings.currentRenderPipeline != null;
-            var sh = urp ? Shader.Find("Universal Render Pipeline/Lit") : Shader.Find("Standard");
+            bool urp = Mat.Urp;
+            var sh = Mat.LitShader();
             m = new Material(sh) { name = "Sprite " + name };
             if (urp)
             {
