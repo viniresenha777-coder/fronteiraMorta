@@ -32,7 +32,7 @@ function toast(text) {
 
 function resetGame() {
   player = {
-    x: 0, y: 0, r: 14, speed: 3, walk: 0, moving: false, flashT: 0, reloadMax: 1,
+    x: 0, y: 0, r: 14, speed: 1.95, walk: 0, moving: false, flashT: 0, reloadMax: 1,
     hp: 100, maxHp: 100, angle: -Math.PI / 2, level: save.char.level, xp: save.char.xp, points: save.char.points, wpoints: save.char.wpoints,
     attrs: save.char.attrs, bag: [], fx: {},
     stamina: 100, exhausted: false, hunger: 100, thirst: 100, food: 1, foodQ: { podre: 0, comum: 1, fresca: 0 }, water: 1, med: 0, infect: 0, anti: 0,
@@ -161,7 +161,7 @@ function update(dt) {
   if (moving) {
     const slow = (save.vest >= 0 ? VESTS[save.vest].slow || 0 : 0) + (curW().slow || 0) - (player.fx.adren && player.hp / player.maxHp < 0.5 ? player.fx.adren : 0);
     player.moveAng = Math.atan2(dy, dx);
-    const len = Math.hypot(dx, dy), sp = (sprinting ? 5.2 * (1 + profVal("sprint")) : player.speed) * (1 + player.fx.agility / 100) * (1 + (A("agi") - 10) * 0.004) * (1 - slow / 100);
+    const len = Math.hypot(dx, dy), sp = (sprinting ? 3.38 * (1 + profVal("sprint")) : player.speed) * (1 + player.fx.agility / 100) * (1 + (A("agi") - 10) * 0.004) * (1 - slow / 100);
     player.x += (dx / len) * sp * k; player.y += (dy / len) * sp * k;
     player.animT = (player.animT || 0) + dt; player.lastSp = sp * k / Math.max(0.01, dt / 16.67);
     if (!game.inside) save.stats.dist = S("dist") + sp * k;
