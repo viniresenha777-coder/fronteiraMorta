@@ -254,6 +254,21 @@ function zombieSheet(z) {
     default: return null;
   }
 }
+// ---------- Corpo do zumbi para os acertos ----------
+// O ponto do zumbi (z.x, z.y) é onde ele pisa; com o desenho em pé, o corpo vai dos pés até
+// a cabeça. O acerto usa uma cápsula vertical com essa altura e a largura do zumbi (z.r).
+function zBodyH(z) {
+  if (!ZSHEET.ok || save.classicChar || z.boss) return 0;
+  const nm = zombieSheet(z); if (!nm) return 0;
+  return ZSHEET.base * (z.r / 13) / (nm === "z_brute" ? 1.4 : 1) * 0.6;
+}
+function zDist(z, x, y) {
+  const h = zBodyH(z);
+  if (!h) return Math.hypot(x - z.x, y - z.y);
+  return Math.hypot(x - z.x, y - clamp(y, z.y - h, z.y));
+}
+function zCenter(z) { return { x: z.x, y: z.y - zBodyH(z) / 2 }; }
+
 // desenha o zumbi com a spritesheet; devolve false se o tipo não tiver (cães, mutantes, chefes...)
 function drawZombieSprite(z) {
   if (!ZSHEET.ok || save.classicChar || z.boss) return false;

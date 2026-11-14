@@ -166,7 +166,8 @@ function attack() {
     for (const z of Zs()) {
       if (z.hp <= 0) continue;
       if (Math.hypot(z.x - player.x, z.y - player.y) > st.range + z.r) continue;
-      if (Math.abs(angDiff(Math.atan2(z.y - player.y, z.x - player.x), player.angle)) > w.arc) continue;
+      const zc = zCenter(z); // mira no meio do corpo desenhado
+      if (Math.abs(angDiff(Math.atan2(zc.y - player.y, zc.x - player.x), player.angle)) > w.arc && Math.abs(angDiff(Math.atan2(z.y - player.y, z.x - player.x), player.angle)) > w.arc) continue;
       const d = hurt(z, st.dmg * dmgMult(w), player.angle, false, w);
       if (w.lifesteal) player.hp = Math.min(player.maxHp, player.hp + d * w.lifesteal);
       const push = w.knock ? 34 : 8;
@@ -350,7 +351,7 @@ function updateBullets(dt, k) {
         break;
       }
       for (const z of list) {
-        if (z.hp <= 0 || b.hit.includes(z) || Math.hypot(b.x - z.x, b.y - z.y) >= z.r + (b.fire ? 8 : 3)) continue;
+        if (z.hp <= 0 || b.hit.includes(z) || zDist(z, b.x, b.y) >= z.r + (b.fire ? 8 : 3)) continue; // corpo inteiro, não só os pés
         if (b.grenade) { b.life = 0; explode(b.x, b.y, b.explode, b.dmg); break; }
         if (!z.boss && !b.fire) { const kb = b.knock ? 1.2 : 0.3; z.x += b.vx * kb; z.y += b.vy * kb; }
         if (b.fire) { b.hit.push(z); hurt(z, b.dmg, null, Math.random() < 0.7, b.fx); continue; }
