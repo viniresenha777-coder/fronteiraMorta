@@ -1,3 +1,4 @@
 *.exe
 windows/game/
 *.tmp
+__pycache__/
