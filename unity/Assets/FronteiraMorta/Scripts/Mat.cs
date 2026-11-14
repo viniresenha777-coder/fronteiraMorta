@@ -151,6 +151,32 @@ namespace FronteiraMorta
             return t;
         }
 
+        /// <summary>Parede de reboco com manchas de umidade e sujeira embaixo.</summary>
+        public static Material Wall(Color c)
+        {
+            string key = "W" + ColorUtility.ToHtmlStringRGB(c);
+            if (cache.TryGetValue(key, out var m)) return m;
+            const int S = 128;
+            var t = NewTex(S);
+            var px = new Color[S * S];
+            var rnd = new System.Random(c.GetHashCode());
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    float n = (float)(rnd.NextDouble() - 0.5) * 0.12f;
+                    float dirt = Mathf.Clamp01(1f - y / (S * 0.35f)) * 0.25f;          // sujeira perto do chão
+                    var col = c * (1f + n - dirt); col.a = 1; px[y * S + x] = col;
+                }
+            for (int k = 0; k < 5; k++)   // escorridos verticais
+            {
+                int x0 = rnd.Next(S), len = rnd.Next(20, 70), y0 = rnd.Next(S / 2, S);
+                for (int y = y0; y > y0 - len && y > 0; y--) for (int dx = 0; dx < 2; dx++) { int ix = (x0 + dx) % S; px[y * S + ix] *= 0.82f; px[y * S + ix].a = 1; }
+            }
+            t.SetPixels(px); t.Apply();
+            m = Textured(key, t, new Vector2(2, 2), 0.08f);
+            return m;
+        }
+
         /// <summary>Telha laranja (fileiras com sombra).</summary>
         public static Texture2D RoofTiles()
         {

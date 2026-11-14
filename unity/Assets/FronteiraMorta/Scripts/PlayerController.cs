@@ -13,7 +13,9 @@ namespace FronteiraMorta
         public readonly WeaponInst[] slots = new WeaponInst[3];
         public int current;
         public readonly Dictionary<string, int> reserve = new Dictionary<string, int>();
-        public int food = 1, water = 1, med = 0, money = 0, kills = 0;
+        public int food = 1, water = 1, med = 0, anti = 0, money = 0, kills = 0;
+        public float hunger = 100, thirst = 100, infect = 0;
+        float hurtFx;
 
         public HumanoidRig rig;
         CharacterController cc;
@@ -45,6 +47,7 @@ namespace FronteiraMorta
             Destroy(bulb.GetComponent<Collider>());
             bulb.transform.SetParent(fl.transform, false); bulb.transform.localScale = new Vector3(0.06f, 0.05f, 0.05f);
             bulb.GetComponent<Renderer>().sharedMaterial = Mat.Emissive(new Color(1f, 0.95f, 0.75f), 3f);
+            Minimap.Marker(transform, new Color(1f, 0.85f, 0.35f), 3.2f, true);
             ResetState();
         }
 
@@ -54,7 +57,8 @@ namespace FronteiraMorta
             slots[0] = new WeaponInst(Weapons.All["pistola"]); slots[1] = new WeaponInst(Weapons.All["faca"]); slots[2] = null;
             current = 0;
             reserve.Clear(); reserve["9mm"] = 36;
-            food = 1; water = 1; med = 0; money = 0; kills = 0;
+            food = 1; water = 1; med = 0; anti = 0; money = 0; kills = 0;
+            hunger = 100; thirst = 100; infect = 0;
             RefreshWeapon();
         }
 
@@ -78,10 +82,12 @@ namespace FronteiraMorta
         public void AddAmmo(string type, int n) { reserve.TryGetValue(type, out int r); reserve[type] = r + n; }
         public int Reserve(string type) { reserve.TryGetValue(type, out int r); return r; }
 
+        public void AddInfection(float n) { if (!dead) infect = Mathf.Min(100, infect + n); }
+
         public void TakeDamage(float d)
         {
             if (dead) return;
-            hp -= d;
+            hp -= d; hurtFx = 1f;
             CameraRig.Shake(0.25f);
             if (hp <= 0) { hp = 0; dead = true; GameManager.I.OnPlayerDied(); }
         }
@@ -102,7 +108,12 @@ namespace FronteiraMorta
             bool moving = dir.sqrMagnitude > 0.01f;
             bool sprint = moving && kb.leftShiftKey.isPressed && stamina > 0 && !exhausted;
             if (sprint) { stamina -= 24f * dt; if (stamina <= 0) { stamina = 0; exhausted = true; } }
-            else { stamina = Mathf.Min(100, stamina + (moving ? 12f : 22f) * dt); if (exhausted && stamina >= 20) exhausted = false; }
+            else if (hunger > 0 && thirst > 0) { stamina = Mathf.Min(100, stamina + (moving ? 12f : 22f) * dt); if (exhausted && stamina >= 20) exhausted = false; }
+            // fome, sede e infecção
+            hunger = Mathf.Max(0, hunger - 0.12f * dt); thirst = Mathf.Max(0, thirst - 0.17f * dt);
+            if (infect >= 100) { hp -= 1.2f * dt; if (hp <= 0) { hp = 0; dead = true; GameManager.I.OnPlayerDied(); return; } }
+            hurtFx = Mathf.Max(0, hurtFx - dt * 1.5f);
+            PostFx.Hurt(Mathf.Max(hurtFx, hp / maxHp < 0.3f ? 0.6f : 0f));
             float speed = sprint ? sprintSpeed : walkSpeed;
             Vector3 vel = moving ? dir.normalized * speed : Vector3.zero;
             vy = cc.isGrounded ? -1f : vy - 20f * dt;
@@ -128,6 +139,9 @@ namespace FronteiraMorta
             if (Mathf.Abs(wheel) > 0.1f) Cycle(wheel < 0 ? 1 : -1);
             if (kb.rKey.wasPressedThisFrame) StartReload();
             if (kb.hKey.wasPressedThisFrame) UseMed();
+            if (kb.fKey.wasPressedThisFrame) Eat();
+            if (kb.gKey.wasPressedThisFrame) Drink();
+            if (kb.iKey.wasPressedThisFrame) UseAnti();
             if (kb.lKey.wasPressedThisFrame) flashlight.enabled = !flashlight.enabled;
 
             cooldown -= dt; attackT = Mathf.Max(0, attackT - dt * 4f); kick = Mathf.Max(0, kick - dt * 8f);
@@ -165,6 +179,27 @@ namespace FronteiraMorta
             if (med <= 0) { GameManager.I.Log("Você não tem kit médico"); return; }
             if (hp >= maxHp) { GameManager.I.Log("Vida cheia"); return; }
             med--; hp = Mathf.Min(maxHp, hp + 40); GameManager.I.Log("Você usou um kit médico");
+        }
+
+        void Eat()
+        {
+            if (food <= 0) { GameManager.I.Log("Você não tem comida"); return; }
+            if (hunger >= 100) { GameManager.I.Log("Sem fome"); return; }
+            food--; hunger = Mathf.Min(100, hunger + 40); GameManager.I.Log("Você comeu");
+        }
+
+        void Drink()
+        {
+            if (water <= 0) { GameManager.I.Log("Você não tem água"); return; }
+            if (thirst >= 100) { GameManager.I.Log("Sem sede"); return; }
+            water--; thirst = Mathf.Min(100, thirst + 40); GameManager.I.Log("Você bebeu");
+        }
+
+        void UseAnti()
+        {
+            if (anti <= 0) { GameManager.I.Log("Você não tem antibiótico"); return; }
+            if (infect <= 0) { GameManager.I.Log("Você não está infectado"); return; }
+            anti--; infect = Mathf.Max(0, infect - 60); GameManager.I.Log($"Antibiótico · infecção {infect:0}%");
         }
 
         void Attack()

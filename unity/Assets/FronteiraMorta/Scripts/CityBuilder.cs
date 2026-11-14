@@ -20,7 +20,7 @@ namespace FronteiraMorta
         public readonly List<Material> litWindows = new List<Material>();
         readonly System.Random R;
         readonly Transform root;
-        Material asphalt, tiles, grass, dirt, roof, glass, glassLit, door, yellow, white, trunk, leaves;
+        Material asphalt, tiles, grass, dirt, roof, glass, glassLit, door, yellow, white, trunk, leaves, frame;
 
         public CityBuilder(int seed, Transform parent) { R = new System.Random(seed); root = parent; }
 
@@ -53,6 +53,7 @@ namespace FronteiraMorta
             white = Mat.Lit(new Color(0.85f, 0.85f, 0.8f));
             trunk = Mat.Lit(new Color(0.25f, 0.17f, 0.1f));
             leaves = Mat.Lit(new Color(0.16f, 0.27f, 0.13f));
+            frame = Mat.Lit(new Color(0.78f, 0.76f, 0.7f), 0.2f);
 
             Box("Asfalto", new Vector3(W / 2, -0.05f, H / 2), new Vector3(W + 60, 0.1f, H + 60), asphalt);
             RoadMarks();
@@ -90,6 +91,12 @@ namespace FronteiraMorta
         {
             var c = new Vector3(r.center.x, 0, r.center.y);
             Box("Calcada", c + Vector3.up * 0.06f, new Vector3(r.width, 0.12f, r.height), tiles);
+            var curb = Mat.Lit(new Color(0.52f, 0.52f, 0.5f), 0.1f);
+            Box("MeioFio", new Vector3(r.center.x, 0.09f, r.yMin + 0.15f), new Vector3(r.width, 0.18f, 0.3f), curb, false);
+            Box("MeioFio", new Vector3(r.center.x, 0.09f, r.yMax - 0.15f), new Vector3(r.width, 0.18f, 0.3f), curb, false);
+            Box("MeioFio", new Vector3(r.xMin + 0.15f, 0.09f, r.center.y), new Vector3(0.3f, 0.18f, r.height), curb, false);
+            Box("MeioFio", new Vector3(r.xMax - 0.15f, 0.09f, r.center.y), new Vector3(0.3f, 0.18f, r.height), curb, false);
+            Clutter(r);
             var inner = new Rect(r.x + SIDEWALK, r.y + SIDEWALK, r.width - 2 * SIDEWALK, r.height - 2 * SIDEWALK);
             float roll = Rf(0, 1);
             if (roll < 0.15f) { Park(inner); return; }
@@ -128,14 +135,14 @@ namespace FronteiraMorta
                 t.name = "Tronco"; t.transform.SetParent(root, false);
                 t.transform.position = new Vector3(x, 1.4f * s, z); t.transform.localScale = new Vector3(0.35f, 1.4f * s, 0.35f);
                 t.GetComponent<Renderer>().sharedMaterial = trunk;
-                for (int k = 0; k < 3; k++)
+                for (int k = 0; k < 4; k++)
                 {
                     var l = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                     Object.Destroy(l.GetComponent<Collider>());
                     l.transform.SetParent(root, false);
                     l.transform.position = new Vector3(x + Rf(-0.8f, 0.8f), 3.4f * s + Rf(-0.3f, 0.5f), z + Rf(-0.8f, 0.8f));
                     l.transform.localScale = Vector3.one * Rf(2.2f, 3.2f) * s;
-                    l.GetComponent<Renderer>().sharedMaterial = leaves;
+                    l.GetComponent<Renderer>().sharedMaterial = Mat.Lit(new Color(0.13f + k * 0.03f + s * 0.02f, 0.25f + k * 0.03f, 0.11f + (R.Next(3)) * 0.02f));
                 }
             }
         }
@@ -152,7 +159,7 @@ namespace FronteiraMorta
             Color[] houseCols = { new Color(0.55f, 0.45f, 0.4f), new Color(0.45f, 0.52f, 0.56f), new Color(0.62f, 0.56f, 0.42f), new Color(0.5f, 0.44f, 0.52f), new Color(0.46f, 0.55f, 0.44f) };
             Color[] comCols = { new Color(0.47f, 0.5f, 0.46f), new Color(0.4f, 0.44f, 0.5f), new Color(0.52f, 0.5f, 0.45f), new Color(0.36f, 0.33f, 0.3f) };
             var wallCol = commercial ? comCols[R.Next(comCols.Length)] : houseCols[R.Next(houseCols.Length)];
-            var wallMat = Mat.Lit(wallCol, 0.1f);
+            var wallMat = Mat.Wall(wallCol);
             var b = Box(commercial ? "Comercio" : "Casa", new Vector3(cx, h / 2 + 0.12f, cz), new Vector3(w, h, d), wallMat);
             float top = h + 0.12f;
             if (commercial)
@@ -169,6 +176,7 @@ namespace FronteiraMorta
                 s1.transform.rotation = Quaternion.Euler(-30, 0, 0);
                 var s2 = Box("Telhado", new Vector3(cx, top + rise / 2, cz + d / 4), new Vector3(w + 0.6f, 0.15f, len), roof, false);
                 s2.transform.rotation = Quaternion.Euler(30, 0, 0);
+                Box("Cumeeira", new Vector3(cx, top + rise + 0.05f, cz), new Vector3(w + 0.7f, 0.18f, 0.32f), Mat.Lit(new Color(0.45f, 0.2f, 0.1f)), false);
                 // oitões (fechamento triangular aproximado)
                 for (int sgn = -1; sgn <= 1; sgn += 2)
                     Box("Oitao", new Vector3(cx + sgn * (w / 2 - 0.05f), top + rise * 0.35f, cz), new Vector3(0.1f, rise * 0.7f, d * 0.55f), wallMat, false);
@@ -184,7 +192,9 @@ namespace FronteiraMorta
                     {
                         if (f == 0 && Mathf.Abs(x - cx) < 1.2f && (side < 0) == facesSouth) continue; // espaço da porta
                         bool lit = Chance(0.18f);
-                        Box("Janela", new Vector3(x, y, cz + side * (d / 2 + 0.03f)), new Vector3(1.1f, 1.2f, 0.06f), lit ? glassLit : glass, false);
+                        Box("Moldura", new Vector3(x, y, cz + side * (d / 2 + 0.02f)), new Vector3(1.3f, 1.4f, 0.05f), frame, false);
+                        Box("Janela", new Vector3(x, y, cz + side * (d / 2 + 0.05f)), new Vector3(1.05f, 1.15f, 0.05f), lit ? glassLit : glass, false);
+                        Box("Peitoril", new Vector3(x, y - 0.75f, cz + side * (d / 2 + 0.09f)), new Vector3(1.45f, 0.08f, 0.18f), frame, false);
                     }
                 }
             float dz = facesSouth ? cz - d / 2 - 0.05f : cz + d / 2 + 0.05f;
@@ -204,6 +214,34 @@ namespace FronteiraMorta
                 crate.AddComponent<Lootable>().Init("caixote", 1.0f, 0.3f, 0.04f);
             }
             if (!commercial && Chance(0.5f)) Trees(new Rect(lot.x, facesSouth ? cz + d / 2 + 2 : lot.y, lot.width, Mathf.Max(3, (facesSouth ? lot.yMax - (cz + d / 2 + 2) : (cz - d / 2 - 2) - lot.y))), 1);
+        }
+
+        // sacos de lixo, entulho, manchas de sangue e de óleo
+        void Clutter(Rect r)
+        {
+            var bag = Mat.Lit(new Color(0.08f, 0.09f, 0.08f), 0.6f);
+            var rubble = Mat.Lit(new Color(0.42f, 0.4f, 0.36f));
+            var blood = Mat.Lit(new Color(0.28f, 0.02f, 0.02f), 0.6f);
+            for (int i = 0; i < 6; i++)
+            {
+                bool alongX = Chance(0.5f);
+                float x = alongX ? Rf(r.xMin + 1, r.xMax - 1) : (Chance(0.5f) ? r.xMin + Rf(0.6f, 2f) : r.xMax - Rf(0.6f, 2f));
+                float z = alongX ? (Chance(0.5f) ? r.yMin + Rf(0.6f, 2f) : r.yMax - Rf(0.6f, 2f)) : Rf(r.yMin + 1, r.yMax - 1);
+                float roll = Rf(0, 1);
+                if (roll < 0.4f)
+                {
+                    var b = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    Object.Destroy(b.GetComponent<Collider>());
+                    b.transform.SetParent(root, false); b.transform.position = new Vector3(x, 0.38f, z);
+                    b.transform.localScale = new Vector3(Rf(0.5f, 0.8f), Rf(0.45f, 0.6f), Rf(0.5f, 0.8f)); b.GetComponent<Renderer>().sharedMaterial = bag;
+                }
+                else if (roll < 0.7f)
+                    for (int k = 0; k < 4; k++) Box("Entulho", new Vector3(x + Rf(-0.6f, 0.6f), 0.18f, z + Rf(-0.6f, 0.6f)), new Vector3(Rf(0.15f, 0.4f), Rf(0.08f, 0.2f), Rf(0.15f, 0.4f)), rubble, false).transform.rotation = Quaternion.Euler(0, Rf(0, 90), 0);
+                else Box("Sangue", new Vector3(x, 0.125f, z), new Vector3(Rf(0.6f, 1.4f), 0.01f, Rf(0.6f, 1.4f)), blood, false).transform.rotation = Quaternion.Euler(0, Rf(0, 90), 0);
+            }
+            // manchas na rua perto da quadra
+            for (int i = 0; i < 3; i++)
+                Box("Mancha", new Vector3(Rf(r.xMin, r.xMax), 0.004f, Chance(0.5f) ? r.yMin - Rf(1, 5) : r.yMax + Rf(1, 5)), new Vector3(Rf(0.8f, 2f), 0.005f, Rf(0.6f, 1.5f)), Chance(0.5f) ? blood : Mat.Lit(new Color(0.05f, 0.05f, 0.06f), 0.8f), false);
         }
 
         void Lamps()
@@ -231,9 +269,13 @@ namespace FronteiraMorta
             pole.name = "Poste"; pole.transform.SetParent(root, false);
             pole.transform.position = p + Vector3.up * 1.9f; pole.transform.localScale = new Vector3(0.14f, 1.9f, 0.14f);
             pole.GetComponent<Renderer>().sharedMaterial = Mat.Lit(new Color(0.1f, 0.1f, 0.1f), 0.5f);
-            Box("Luminaria", p + Vector3.up * 3.85f, new Vector3(0.5f, 0.15f, 0.5f), Mat.Emissive(new Color(1f, 0.85f, 0.55f), 1f), false);
+            Vector3 toStreet = new Vector3(MidX - p.x, 0, MidZ - p.z);
+            toStreet = Mathf.Abs(toStreet.x) < Mathf.Abs(toStreet.z) ? new Vector3(0, 0, Mathf.Sign(toStreet.z)) : new Vector3(Mathf.Sign(toStreet.x), 0, 0);
+            var arm = Box("Braco", p + Vector3.up * 3.75f + toStreet * 0.6f, new Vector3(0.08f, 0.08f, 1.2f), Mat.Lit(new Color(0.1f, 0.1f, 0.1f), 0.5f), false);
+            arm.transform.rotation = Quaternion.LookRotation(toStreet);
+            Box("Luminaria", p + Vector3.up * 3.68f + toStreet * 1.15f, new Vector3(0.45f, 0.12f, 0.6f), Mat.Emissive(new Color(1f, 0.85f, 0.55f), 1.4f), false).transform.rotation = Quaternion.LookRotation(toStreet);
             var lg = new GameObject("Luz");
-            lg.transform.SetParent(root, false); lg.transform.position = p + Vector3.up * 3.6f;
+            lg.transform.SetParent(root, false); lg.transform.position = p + Vector3.up * 3.5f + toStreet * 1.15f;
             var l = lg.AddComponent<Light>();
             l.type = LightType.Point; l.range = 13f; l.intensity = 0f; l.color = new Color(1f, 0.8f, 0.5f); l.shadows = LightShadows.None;
             lamps.Add(l);
@@ -257,6 +299,23 @@ namespace FronteiraMorta
                 body.transform.localPosition = new Vector3(0, 0.7f, 0); body.transform.localRotation = Quaternion.identity;
                 var cab = Box("Cabine", pos, new Vector3(1.7f, 0.65f, 2.2f), Mat.Lit(new Color(0.12f, 0.16f, 0.2f), 0.85f), false, car.transform);
                 cab.transform.localPosition = new Vector3(0, 1.4f, -0.2f); cab.transform.localRotation = Quaternion.identity;
+                var tire = Mat.Lit(new Color(0.05f, 0.05f, 0.05f), 0.3f);
+                foreach (var (wx, wz) in new[] { (-0.95f, 1.35f), (0.95f, 1.35f), (-0.95f, -1.35f), (0.95f, -1.35f) })
+                {
+                    var wheel = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    Object.Destroy(wheel.GetComponent<Collider>());
+                    wheel.transform.SetParent(car.transform, false);
+                    wheel.transform.localPosition = new Vector3(wx, 0.35f, wz); wheel.transform.localRotation = Quaternion.Euler(0, 0, 90);
+                    wheel.transform.localScale = new Vector3(0.7f, 0.12f, 0.7f);
+                    wheel.GetComponent<Renderer>().sharedMaterial = tire;
+                }
+                var headM = wreck ? Mat.Lit(new Color(0.3f, 0.3f, 0.3f)) : Mat.Emissive(new Color(1f, 0.92f, 0.7f), 0.8f);
+                var tailM = Mat.Emissive(new Color(0.8f, 0.1f, 0.08f), wreck ? 0.1f : 0.6f);
+                foreach (float sx in new[] { -0.6f, 0.6f })
+                {
+                    var hl = Box("Farol", pos, new Vector3(0.35f, 0.15f, 0.05f), headM, false, car.transform); hl.transform.localPosition = new Vector3(sx, 0.8f, 2.16f); hl.transform.localRotation = Quaternion.identity;
+                    var tl = Box("Lanterna", pos, new Vector3(0.35f, 0.15f, 0.05f), tailM, false, car.transform); tl.transform.localPosition = new Vector3(sx, 0.8f, -2.16f); tl.transform.localRotation = Quaternion.identity;
+                }
                 if (Chance(0.3f)) body.AddComponent<Lootable>().Init("carro", 1.6f, 0.3f, 0.05f);
             }
         }

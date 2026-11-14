@@ -16,6 +16,7 @@ namespace FronteiraMorta
         float attackCd, alertT, wanderT, vy, flashT, deadT, lunge;
         Vector3 wanderDir, knock;
         bool chasing;
+        GameObject marker;
 
         public void Init(ZombieType t, PlayerController p, int danger)
         {
@@ -37,6 +38,7 @@ namespace FronteiraMorta
             float sc = look.scale;
             cc.height = 1.8f * sc; cc.radius = 0.32f * sc; cc.center = new Vector3(0, 0.9f * sc, 0); cc.stepOffset = 0.3f;
             rig = HumanoidRig.Build(transform, look);
+            marker = Minimap.Marker(transform, new Color(0.95f, 0.25f, 0.2f), 1.6f);
             wanderDir = Quaternion.Euler(0, Random.Range(0, 360f), 0) * Vector3.forward;
             transform.rotation = Quaternion.LookRotation(wanderDir);
         }
@@ -60,6 +62,7 @@ namespace FronteiraMorta
         void Die(Vector3 dir)
         {
             Dead = true; cc.enabled = false;
+            if (marker != null) Destroy(marker);
             player.kills++; player.money += type == ZombieType.Brute ? 6 : 2;
             GameManager.I.OnZombieKilled(this);
             deadT = 0;
@@ -121,6 +124,7 @@ namespace FronteiraMorta
             {
                 attackCd = attackDelay; lunge = 1f;
                 player.TakeDamage(damage * GameManager.I.DamageMul);
+                player.AddInfection(type == ZombieType.Hazmat ? 6f : 3f);
             }
             flashT -= dt;
             float move01 = spd > 0.01f ? Mathf.Clamp01(spd / 2f) : 0f;

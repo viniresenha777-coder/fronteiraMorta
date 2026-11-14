@@ -21,6 +21,7 @@ namespace FronteiraMorta
         public int maxZombies = 22;
 
         CityBuilder city;
+        Minimap minimap;
         Light sun;
         Camera cam;
         float clock = 8 * 60f;                   // minutos do dia; 1 dia = 8 minutos reais
@@ -60,9 +61,12 @@ namespace FronteiraMorta
             player = pg.AddComponent<PlayerController>();
             player.Init(cam);
             cam.gameObject.AddComponent<CameraRig>().Init(cam, pg.transform);
+            PostFx.Setup(cam);
             hud = new Hud();
+            minimap = gameObject.AddComponent<Minimap>();
+            minimap.Init(cam, pg.transform, hud.canvas, hud.font);
             Log("Fronteira Morta · WASD anda · Shift corre · mouse mira e atira · segure E para vasculhar");
-            Log("1 2 3 / roda trocam arma · R recarrega · H kit médico · L lanterna · Esc pausa");
+            Log("1 2 3 / roda trocam arma · R recarrega · F come · G bebe · H kit · I antibiótico · L lanterna · M mapa · Esc pausa");
             spawnT = 2f;
         }
 
@@ -90,7 +94,7 @@ namespace FronteiraMorta
             sun.color = Color.Lerp(new Color(0.55f, 0.65f, 0.9f), new Color(1f, 0.95f, 0.85f), 1 - Darkness);
             var fog = Color.Lerp(new Color(0.24f, 0.33f, 0.45f), new Color(0.04f, 0.06f, 0.1f), Darkness);   // neblina azulada
             RenderSettings.fogColor = fog; cam.backgroundColor = fog;
-            RenderSettings.fogStartDistance = 26f; RenderSettings.fogEndDistance = Mathf.Lerp(80f, 52f, Darkness);
+            RenderSettings.fogStartDistance = 20f; RenderSettings.fogEndDistance = Mathf.Lerp(70f, 45f, Darkness);
             RenderSettings.ambientLight = Color.Lerp(new Color(0.42f, 0.46f, 0.52f), new Color(0.07f, 0.09f, 0.14f), Darkness);
             foreach (var l in city.lamps) l.intensity = Darkness > 0.35f ? 2.2f * Darkness : 0f;
 
@@ -99,11 +103,11 @@ namespace FronteiraMorta
                 deadT += dt;
                 hud.SetCenter(deadT > 1.5f ? "Você morreu\n<size=22>Aperte Enter para recomeçar</size>" : "Você morreu");
                 if (deadT > 1.5f && kb != null && kb.enterKey.wasPressedThisFrame) Restart();
-                hud.Refresh(player, Clock(), "Área A4 · Azul");
+                RefreshHud();
                 return;
             }
             hud.SetCenter(Paused ? "PAUSADO\n<size=22>Esc para continuar</size>" : "");
-            if (Paused) { hud.Refresh(player, Clock(), "Área A4 · Azul"); return; }
+            if (Paused) { RefreshHud(); return; }
 
             // ---- zumbis nascem longe da tela
             zombies.RemoveAll(z => z == null);
@@ -122,7 +126,13 @@ namespace FronteiraMorta
             }
             else hud.SetPrompt("", 0);
 
-            hud.Refresh(player, Clock(), "Área A4 · Azul");
+            RefreshHud();
+        }
+
+        void RefreshHud()
+        {
+            hud.Refresh(player, "PERIGO: MUITO FÁCIL");
+            minimap.SetTexts("A4 · VILA FUMAÇA", $"A4 · Azul · Dia 1 · {Clock()}");
         }
 
         int CountAlive() { int n = 0; foreach (var z in zombies) if (z != null && !z.Dead) n++; return n; }
