@@ -163,7 +163,7 @@ function update(dt) {
     player.moveAng = Math.atan2(dy, dx);
     const len = Math.hypot(dx, dy), sp = (sprinting ? 5.2 * (1 + profVal("sprint")) : player.speed) * (1 + player.fx.agility / 100) * (1 + (A("agi") - 10) * 0.004) * (1 - slow / 100);
     player.x += (dx / len) * sp * k; player.y += (dy / len) * sp * k;
-    player.animT = (player.animT || 0) + dt;
+    player.animT = (player.animT || 0) + dt; player.lastSp = sp * k / Math.max(0.01, dt / 16.67);
     if (!game.inside) save.stats.dist = S("dist") + sp * k;
     player.walk += sp * k * 0.16;
     if (sprinting && Math.random() < dt / 70) dust(player.x - (dx / len) * 8, player.y - (dy / len) * 8);
@@ -184,6 +184,7 @@ function update(dt) {
   if (!game.inside && moving) edgeCheck(dx, dy);
   const ox = cam.x, oy = cam.y;
   player.angle = Math.atan2(mouse.y + oy - player.y, mouse.x + ox - player.x);
+  spriteTick(dt);
 
   // tiro e recarga
   const w = curW(), inst = curInst();

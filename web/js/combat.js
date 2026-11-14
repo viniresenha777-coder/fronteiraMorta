@@ -174,9 +174,17 @@ function attack() {
     }
     return;
   }
-  const n = w.pellets || 1, mx = player.x + Math.cos(player.angle) * (w.len + 12), my = player.y + Math.sin(player.angle) * (w.len + 12);
+  let mx = player.x + Math.cos(player.angle) * (w.len + 12), my = player.y + Math.sin(player.angle) * (w.len + 12), aim = player.angle;
+  const mz = muzzlePoint(); // personagem novo: sai da ponta do cano e vai na direção do mouse
+  if (mz) {
+    mx = mz.x; my = mz.y;
+    const tx = mouse.x + cam.x, ty = mouse.y + cam.y;
+    if (Math.hypot(tx - mx, ty - my) > 40) aim = Math.atan2(ty - my, tx - mx);
+  }
+  player.shotAng = aim;
+  const n = w.pellets || 1;
   for (let i = 0; i < n; i++) {
-    const a = player.angle + (Math.random() - 0.5) * 2 * st.spread * Math.max(0.15, 10 / A("acc")) * (1 - Math.min(0.6, player.fx.accImp / 100));
+    const a = aim + (Math.random() - 0.5) * 2 * st.spread * Math.max(0.15, 10 / A("acc")) * (1 - Math.min(0.6, player.fx.accImp / 100));
     const sp = (w.speed || 12) * (w.fire ? rand(0.8, 1.2) : 1);
     bullets.push({ x: mx, y: my, px: mx, py: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.life || 900, max: w.life || 900,
       dmg: st.dmg * dmgMult(w), pierce: !!w.pierce, hit: [], big: w.cat === "rifles" || w.rar >= 3, fire: !!w.fire, explode: w.explode || 0, bolt: w.look === "crossbow",

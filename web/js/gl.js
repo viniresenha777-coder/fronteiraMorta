@@ -283,7 +283,7 @@ function gfxLights(dark) {
   };
   const fl = (seed, sp) => 0.82 + 0.18 * Math.sin(t / sp + seed) * Math.sin(t / (sp * 0.37) + seed * 3);
   if (!game.over) {
-    const px = player.x - ox, py = player.y - oy, a = player.angle;
+    const L0 = typeof chestPoint === "function" ? chestPoint() : player, px = L0.x - ox, py = L0.y - oy, a = player.angle;
     add(px, py, game.inside ? 240 : 150, dark * 1.05, [1, 0.96, 0.9], true);
     if (dark > 0.12) add(px, py, 460, (dark - 0.08) * 1.7, [1, 0.86, 0.55], true, [Math.cos(a), Math.sin(a), Math.cos(0.5), 0.14]); // lanterna amarelada
     if (player.flashT > 0) add(px + Math.cos(a) * 30, py + Math.sin(a) * 30, 280, 1.1 * glow * (Math.min(1, player.flashT / 60) + 0.4), [1, 0.75, 0.38], true);

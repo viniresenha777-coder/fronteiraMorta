@@ -119,31 +119,65 @@ function drawCanopiesP() {
 }
 
 // ---------- Personagem: spritesheet 8 direções × 8 quadros (128×128) ----------
-const PSHEET = { img: null, ok: false, cell: 128, size: 86, footY: 0.82 };
+const PSHEET = { img: null, ok: false, cell: 128, size: 86, footY: 0.82, stride: 19 };
+// ponta do cano e lanterna de peito em cada quadro [direção][quadro] = [x, y] dentro do quadro de 128 px
+// (calculado com a mesma geometria 3D do tools/gerar_personagem_camera.py)
+const PS_MUZZLE = [[[70.0, 0.7], [74.3, 2.2], [76.1, 3.5], [74.3, 2.2], [70.0, 0.7], [65.6, 1.4], [63.8, 2.3], [65.6, 1.4]], [[100.5, 13.2], [103.4, 16.8], [104.6, 18.9], [103.4, 16.8], [100.5, 13.2], [97.4, 11.6], [96.0, 11.6], [97.4, 11.6]], [[114.4, 46.9], [113.7, 51.3], [113.3, 53.7], [113.7, 51.3], [114.4, 46.9], [114.7, 44.2], [114.7, 43.6], [114.7, 44.2]], [[91.3, 77.0], [87.5, 79.7], [85.9, 81.3], [87.5, 79.7], [91.3, 77.0], [94.9, 75.8], [96.3, 75.8], [94.9, 75.8]], [[58.0, 83.2], [53.7, 83.6], [51.9, 84.2], [53.7, 83.6], [58.0, 83.2], [62.4, 84.4], [64.2, 85.3], [62.4, 84.4]], [[27.5, 70.8], [24.6, 69.0], [23.4, 68.7], [24.6, 69.0], [27.5, 70.8], [30.6, 74.2], [32.0, 76.0], [30.6, 74.2]], [[13.6, 37.1], [14.3, 34.4], [14.7, 33.9], [14.3, 34.4], [13.6, 37.1], [13.3, 41.6], [13.3, 44.0], [13.3, 41.6]], [[36.7, 6.9], [40.5, 6.1], [42.1, 6.3], [40.5, 6.1], [36.7, 6.9], [33.1, 9.9], [31.7, 11.8], [33.1, 9.9]]];
+const PS_CHEST = [[[60.2, 25.5], [61.2, 26.2], [61.7, 27.1], [61.2, 26.2], [60.2, 25.5], [59.1, 26.8], [58.7, 27.8], [59.1, 26.8]], [[68.9, 25.8], [70.0, 27.1], [70.4, 28.2], [70.0, 27.1], [68.9, 25.8], [67.9, 26.5], [67.4, 27.3], [67.9, 26.5]], [[76.5, 32.6], [76.7, 34.4], [76.8, 35.7], [76.7, 34.4], [76.5, 32.6], [76.1, 32.6], [75.9, 33.2], [76.1, 32.6]], [[74.9, 41.6], [74.2, 43.3], [73.9, 44.5], [74.2, 43.3], [74.9, 41.6], [75.5, 41.8], [75.7, 42.3], [75.5, 41.8]], [[67.8, 45.9], [66.8, 47.1], [66.3, 48.1], [66.8, 47.1], [67.8, 45.9], [68.9, 46.6], [69.3, 47.3], [68.9, 46.6]], [[59.1, 45.6], [58.0, 46.2], [57.6, 46.9], [58.0, 46.2], [59.1, 45.6], [60.1, 46.9], [60.6, 47.9], [60.1, 46.9]], [[51.5, 38.9], [51.3, 38.9], [51.2, 39.4], [51.3, 38.9], [51.5, 38.9], [51.9, 40.7], [52.1, 41.9], [51.9, 40.7]], [[53.1, 29.8], [53.8, 30.0], [54.1, 30.6], [53.8, 30.0], [53.1, 29.8], [52.5, 31.5], [52.3, 32.8], [52.5, 31.5]]];
 (function loadPlayerSheet() {
   const im = new Image();
   im.onload = () => { PSHEET.ok = true; };
   im.src = "img/player_camera.png";
   PSHEET.img = im;
 })();
-function useSpriteChar() { return PSHEET.ok && !save.classicChar; }
-// linha = direção na tela (0 = cima, sentido horário), pela mira do mouse
+function useSpriteChar() { return PSHEET.ok && !save.classicChar && !game.over; }
+// linha = direção na tela (0 = cima, sentido horário)
 function sheetRow(vx, vy) { const a = Math.atan2(vx, -vy); return ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8; }
+function angDelta(a, b) { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; }
+// gira o corpo suavemente atrás da mira e só troca de direção com uma folga (sem tremer na divisa)
+function spriteTick(dt) {
+  const p = player;
+  if (p.dispAng == null) p.dispAng = p.angle;
+  const d = angDelta(p.dispAng, p.angle), maxStep = 14 * dt / 1000;
+  p.dispAng += Math.abs(d) <= maxStep ? d : Math.sign(d) * maxStep;
+  const center = (r) => -Math.PI / 2 + r * Math.PI / 4; // ângulo da tela (atan2(y, x)) no meio de cada linha
+  if (p.sRow == null) p.sRow = sheetRow(Math.cos(p.dispAng), Math.sin(p.dispAng));
+  if (Math.abs(angDelta(center(p.sRow), p.dispAng)) > Math.PI / 8 + 0.12) p.sRow = sheetRow(Math.cos(p.dispAng), Math.sin(p.dispAng));
+  // passos pela distância andada: os pés acompanham o chão
+  if (p.moving) p.stepDist = (p.stepDist || 0) + (p.lastSp || 0) * dt / 16.67;
+}
+function spriteFrame() { const p = player; return p.moving ? Math.floor((p.stepDist || 0) / PSHEET.stride) % 8 : 1; }
+function spriteOrigin() { const S = PSHEET.size; return { x: player.x - S / 2, y: player.y + 6 - S * PSHEET.footY }; }
+// ponto do quadro (px de 0 a 128) -> mundo
+function spritePoint(tab) {
+  const o = spriteOrigin(), k = PSHEET.size / PSHEET.cell, pt = tab[player.sRow | 0][spriteFrame()];
+  return { x: o.x + pt[0] * k, y: o.y + pt[1] * k };
+}
+function muzzlePoint() { return useSpriteChar() ? spritePoint(PS_MUZZLE) : null; }
+function chestPoint() { return useSpriteChar() ? spritePoint(PS_CHEST) : { x: player.x, y: player.y }; }
+
 function drawPlayerSprite() {
   if (!useSpriteChar()) return false;
-  const p = player, S = PSHEET.size, c = PSHEET.cell;
-  const row = sheetRow(Math.cos(p.angle), Math.sin(p.angle));
-  const fps = p.sprinting ? 14 : 10;
-  const col = p.moving ? Math.floor(((p.animT || 0) / 1000) * fps) % 8 : 1;
-  const kick = p.flashT > 0 ? -2 : 0;
-  ctx.drawImage(PSHEET.img, col * c, row * c, c, c,
-    p.x - S / 2 - Math.cos(p.angle) * kick, p.y + 6 - S * PSHEET.footY - Math.sin(p.angle) * kick, S, S);
-  // clarão do tiro na ponta do rifle
+  const p = player, S = PSHEET.size, c = PSHEET.cell, row = p.sRow | 0, col = spriteFrame();
+  const kick = p.flashT > 0 ? 2 : 0, o = spriteOrigin();
+  ctx.drawImage(PSHEET.img, col * c, row * c, c, c, o.x - Math.cos(p.angle) * kick, o.y - Math.sin(p.angle) * kick, S, S);
+  // lanterna de peito (aparece quando o peito está virado para a câmera)
+  if (row >= 1 && row <= 7) {
+    const L = chestPoint(), a = row === 1 || row === 7 ? 0.55 : 1;
+    ctx.save(); ctx.globalAlpha = a; ctx.globalCompositeOperation = "lighter";
+    const g = ctx.createRadialGradient(L.x, L.y, 0, L.x, L.y, 7);
+    g.addColorStop(0, "rgba(255,240,190,0.95)"); g.addColorStop(1, "rgba(255,220,140,0)");
+    ctx.fillStyle = g; circle(L.x, L.y, 7);
+    ctx.restore();
+    ctx.fillStyle = "#1c1c1c"; ctx.fillRect(L.x - 2.5, L.y - 2, 5, 4);
+    ctx.fillStyle = "#fff4cf"; circle(L.x, L.y, 1.6);
+  }
+  // clarão do tiro na ponta do cano
   const w = curW();
   if (p.flashT > 0 && !w.melee) {
-    const tx = p.x + Math.cos(p.angle) * 30, ty = p.y - 14 + Math.sin(p.angle) * 30;
-    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(tx, ty); ctx.rotate(p.angle);
-    ctx.fillStyle = "rgba(255,220,120,0.9)"; ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(16, 0); ctx.lineTo(0, 6); ctx.lineTo(4, 0); ctx.closePath(); ctx.fill();
+    const m = muzzlePoint(), ang = p.shotAng != null ? p.shotAng : p.angle;
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(m.x, m.y); ctx.rotate(ang);
+    ctx.fillStyle = "rgba(255,220,120,0.9)"; ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(18, 0); ctx.lineTo(0, 6); ctx.lineTo(4, 0); ctx.closePath(); ctx.fill();
     ctx.fillStyle = "rgba(255,255,220,0.9)"; circle(2, 0, 4);
     ctx.restore();
   }
@@ -154,7 +188,7 @@ function drawPlayerSprite() {
 function drawAtmosphere() {
   if (game.over) return;
   const dark = game.inside ? 0.3 : darkness();
-  const px = player.x - cam.x, py = player.y - cam.y, a = player.angle;
+  const L = chestPoint(), px = L.x - cam.x, py = L.y - cam.y, a = player.angle;
   // cone amarelado da lanterna na direção da mira
   const reach = 360, half = 0.42, I = 0.05 + dark * 0.22;
   ctx.save(); ctx.globalCompositeOperation = "lighter";
