@@ -879,6 +879,7 @@ function drawZombie(z) {
     return;
   }
   drawZombieFx(z);
+  if (drawZombieSprite(z)) return; // zumbi humanoide com spritesheet (câmera inclinada)
   const s = z.r / 13, t = z.type;
   if (z.boss) {
     const g = ctx.createRadialGradient(z.x, z.y, z.r * 0.5, z.x, z.y, z.r * 2.2);

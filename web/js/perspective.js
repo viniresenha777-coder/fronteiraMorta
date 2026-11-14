@@ -118,20 +118,35 @@ function drawCanopiesP() {
   ctx.globalAlpha = 1;
 }
 
-// ---------- Personagem: spritesheet 8 direções × 8 quadros (128×128) ----------
-const PSHEET = { img: null, ok: false, cell: 128, size: 86, footY: 0.82, stride: 12.5 };
-// ponta do cano e lanterna de peito em cada quadro [direção][quadro] = [x, y] dentro do quadro de 128 px
-// (calculado com a mesma geometria 3D do tools/gerar_personagem_camera.py)
-const PS_MUZZLE = [[[70.0, 0.7], [74.3, 2.2], [76.1, 3.5], [74.3, 2.2], [70.0, 0.7], [65.6, 1.4], [63.8, 2.3], [65.6, 1.4]], [[100.5, 13.2], [103.4, 16.8], [104.6, 18.9], [103.4, 16.8], [100.5, 13.2], [97.4, 11.6], [96.0, 11.6], [97.4, 11.6]], [[114.4, 46.9], [113.7, 51.3], [113.3, 53.7], [113.7, 51.3], [114.4, 46.9], [114.7, 44.2], [114.7, 43.6], [114.7, 44.2]], [[91.3, 77.0], [87.5, 79.7], [85.9, 81.3], [87.5, 79.7], [91.3, 77.0], [94.9, 75.8], [96.3, 75.8], [94.9, 75.8]], [[58.0, 83.2], [53.7, 83.6], [51.9, 84.2], [53.7, 83.6], [58.0, 83.2], [62.4, 84.4], [64.2, 85.3], [62.4, 84.4]], [[27.5, 70.8], [24.6, 69.0], [23.4, 68.7], [24.6, 69.0], [27.5, 70.8], [30.6, 74.2], [32.0, 76.0], [30.6, 74.2]], [[13.6, 37.1], [14.3, 34.4], [14.7, 33.9], [14.3, 34.4], [13.6, 37.1], [13.3, 41.6], [13.3, 44.0], [13.3, 41.6]], [[36.7, 6.9], [40.5, 6.1], [42.1, 6.3], [40.5, 6.1], [36.7, 6.9], [33.1, 9.9], [31.7, 11.8], [33.1, 9.9]]];
-const PS_CHEST = [[[60.2, 25.5], [61.2, 26.2], [61.7, 27.1], [61.2, 26.2], [60.2, 25.5], [59.1, 26.8], [58.7, 27.8], [59.1, 26.8]], [[68.9, 25.8], [70.0, 27.1], [70.4, 28.2], [70.0, 27.1], [68.9, 25.8], [67.9, 26.5], [67.4, 27.3], [67.9, 26.5]], [[76.5, 32.6], [76.7, 34.4], [76.8, 35.7], [76.7, 34.4], [76.5, 32.6], [76.1, 32.6], [75.9, 33.2], [76.1, 32.6]], [[74.9, 41.6], [74.2, 43.3], [73.9, 44.5], [74.2, 43.3], [74.9, 41.6], [75.5, 41.8], [75.7, 42.3], [75.5, 41.8]], [[67.8, 45.9], [66.8, 47.1], [66.3, 48.1], [66.8, 47.1], [67.8, 45.9], [68.9, 46.6], [69.3, 47.3], [68.9, 46.6]], [[59.1, 45.6], [58.0, 46.2], [57.6, 46.9], [58.0, 46.2], [59.1, 45.6], [60.1, 46.9], [60.6, 47.9], [60.1, 46.9]], [[51.5, 38.9], [51.3, 38.9], [51.2, 39.4], [51.3, 38.9], [51.5, 38.9], [51.9, 40.7], [52.1, 41.9], [51.9, 40.7]], [[53.1, 29.8], [53.8, 30.0], [54.1, 30.6], [53.8, 30.0], [53.1, 29.8], [52.5, 31.5], [52.3, 32.8], [52.5, 31.5]]];
-(function loadPlayerSheet() {
-  const im = new Image();
-  im.onload = () => { PSHEET.ok = true; };
-  im.src = "img/player_camera.png";
-  PSHEET.img = im;
+// ---------- Personagem: uma spritesheet por pose de arma (8 direções × 8 quadros, 128 px) ----------
+// O corpo vem sem arma; cada arma do jogo é desenhada nas mãos usando os pontos de
+// SPRITE_POSES (empunhadura, eixo da arma, mãos e lanterna), gerados em tools/gerar_variantes.py.
+const PSHEET = { ok: false, cell: 128, size: 86, footY: 0.82, stride: 12.5, sheets: {} };
+const POSES = ["longa", "pesada", "pistola", "melee", "punhos"];
+(function loadPlayerSheets() {
+  let n = 0;
+  for (const pose of POSES) {
+    const im = new Image();
+    im.onload = () => { if (++n === POSES.length) PSHEET.ok = true; };
+    im.src = `img/player_${pose}.png`;
+    PSHEET.sheets[pose] = im;
+  }
 })();
-function useSpriteChar() { return PSHEET.ok && !save.classicChar && !game.over; }
-// linha = direção na tela (0 = cima, sentido horário)
+// qual pose de braços cada arma usa
+function weaponPose(w) {
+  if (!w || w.fists) return "punhos";
+  if (w.look === "chainsaw") return "pesada";
+  if (w.melee) return "melee";
+  if (w.look === "pistol" || w.look === "revolver") return "pistola";
+  if (w.look === "minigun" || w.look === "lmg" || w.look === "flamer") return "pesada";
+  return "longa";
+}
+// tamanho de verdade (metros) de cada tipo de arma, para ficar proporcional ao corpo
+const WEAPON_M = { pistol: 0.24, revolver: 0.27, smg: 0.5, ar: 0.82, rifle: 1.0, shotgun: 0.95, lmg: 1.0, minigun: 1.0, flamer: 0.9,
+  crossbow: 0.72, knife: 0.32, machete: 0.58, katana: 0.98, sword: 0.92, bat: 0.82, axe: 0.78, hammer: 0.82, chainsaw: 0.9 };
+function weaponMeters(w) { return WEAPON_M[w.look] || (w.melee ? 0.6 : 0.85); }
+
+function useSpriteChar() { return PSHEET.ok && typeof SPRITE_POSES !== "undefined" && !save.classicChar && !game.over; }
 function sheetRow(vx, vy) { const a = Math.atan2(vx, -vy); return ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8; }
 function angDelta(a, b) { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; }
 // gira o corpo suavemente atrás da mira e só troca de direção com uma folga (sem tremer na divisa)
@@ -140,27 +155,62 @@ function spriteTick(dt) {
   if (p.dispAng == null) p.dispAng = p.angle;
   const d = angDelta(p.dispAng, p.angle), maxStep = 14 * dt / 1000;
   p.dispAng += Math.abs(d) <= maxStep ? d : Math.sign(d) * maxStep;
-  const center = (r) => -Math.PI / 2 + r * Math.PI / 4; // ângulo da tela (atan2(y, x)) no meio de cada linha
+  const center = (r) => -Math.PI / 2 + r * Math.PI / 4;
   if (p.sRow == null) p.sRow = sheetRow(Math.cos(p.dispAng), Math.sin(p.dispAng));
   if (Math.abs(angDelta(center(p.sRow), p.dispAng)) > Math.PI / 8 + 0.12) p.sRow = sheetRow(Math.cos(p.dispAng), Math.sin(p.dispAng));
-  // passos pela distância andada: os pés acompanham o chão
   if (p.moving) p.stepDist = (p.stepDist || 0) + (p.lastSp || 0) * dt / 16.67;
 }
 function spriteFrame() { const p = player; return p.moving ? Math.floor((p.stepDist || 0) / PSHEET.stride) % 8 : 1; }
 function spriteOrigin() { const S = PSHEET.size; return { x: player.x - S / 2, y: player.y + 6 - S * PSHEET.footY }; }
-// ponto do quadro (px de 0 a 128) -> mundo
-function spritePoint(tab) {
-  const o = spriteOrigin(), k = PSHEET.size / PSHEET.cell, pt = tab[player.sRow | 0][spriteFrame()];
+// ponto do quadro atual (px de 0 a 128) -> mundo
+function posePt(key, pose) {
+  pose = pose || weaponPose(curW());
+  const o = spriteOrigin(), k = PSHEET.size / PSHEET.cell, pt = SPRITE_POSES[pose][player.sRow | 0][spriteFrame()][key];
   return { x: o.x + pt[0] * k, y: o.y + pt[1] * k };
 }
-function muzzlePoint() { return useSpriteChar() ? spritePoint(PS_MUZZLE) : null; }
-function chestPoint() { return useSpriteChar() ? spritePoint(PS_CHEST) : { x: player.x, y: player.y }; }
+// ponta do cano da arma em uso
+function muzzlePoint() {
+  if (!useSpriteChar()) return null;
+  const w = curW(); if (w.melee) return null;
+  const A = posePt("a"), B = posePt("b"), m = weaponMeters(w);
+  return { x: A.x + (B.x - A.x) * m, y: A.y + (B.y - A.y) * m };
+}
+function chestPoint() { return useSpriteChar() ? posePt("c") : { x: player.x, y: player.y }; }
+
+// desenha a arma em uso nas mãos, seguindo o eixo da pose naquele quadro
+function drawHeldWeapon(w, pose) {
+  if (w.fists) return;
+  const A = posePt("a", pose), B = posePt("b", pose), U = posePt("u", pose);
+  const m = weaponMeters(w), axX = B.x - A.x, axY = B.y - A.y;
+  const lenPx = Math.hypot(axX, axY) * m, pxPerM = PSHEET.size / PSHEET.cell * 64;
+  let ang = Math.atan2(axY, axX);
+  const thick = clamp(0.5 + 0.5 * Math.hypot(U.x - A.x, U.y - A.y) / (0.1 * pxPerM), 0.55, 1);
+  ctx.save(); ctx.translate(A.x, A.y);
+  if (w.melee) {
+    // golpe: a lâmina varre de um lado para o outro em volta da mão
+    if (game.slashT > 0) ang += (-1 + (1 - game.slashT / 200) * 2) * (game.slashA || 0.9) * 1.2 + (player.angle - ang) * 0.6;
+    ctx.rotate(ang);
+    const model = (w.len || 20) + 18;
+    ctx.scale(Math.max(0.25, lenPx / model), thick); ctx.translate(-8, -6);
+    drawWeaponShape(w, 0);
+  } else {
+    ctx.rotate(ang);
+    const model = (w.len || 20) + 20, start = w.look === "pistol" || w.look === "revolver" ? 10 : 0;
+    ctx.scale(Math.max(0.2, lenPx / (model - start)), thick); ctx.translate(-start, 0);
+    if (w.tint) ctx.filter = w.tint;
+    drawWeaponShape(w, 0);
+    ctx.filter = "none";
+  }
+  ctx.restore();
+}
 
 function drawPlayerSprite() {
   if (!useSpriteChar()) return false;
-  const p = player, S = PSHEET.size, c = PSHEET.cell, row = p.sRow | 0, col = spriteFrame();
-  const kick = p.flashT > 0 ? 2 : 0, o = spriteOrigin();
-  ctx.drawImage(PSHEET.img, col * c, row * c, c, c, o.x - Math.cos(p.angle) * kick, o.y - Math.sin(p.angle) * kick, S, S);
+  const p = player, w = curW(), pose = weaponPose(w), S = PSHEET.size, c = PSHEET.cell, row = p.sRow | 0, col = spriteFrame();
+  const kick = p.flashT > 0 ? 2 : 0, o = spriteOrigin(), info = SPRITE_POSES[pose][row][col];
+  if (info.bh) drawHeldWeapon(w, pose);       // arma atrás do corpo (de costas)
+  ctx.drawImage(PSHEET.sheets[pose], col * c, row * c, c, c, o.x - Math.cos(p.angle) * kick, o.y - Math.sin(p.angle) * kick, S, S);
+  if (!info.bh) drawHeldWeapon(w, pose);      // arma na frente do corpo
   // lanterna de peito (aparece quando o peito está virado para a câmera)
   if (row >= 1 && row <= 7) {
     const L = chestPoint(), a = row === 1 || row === 7 ? 0.55 : 1;
@@ -173,13 +223,60 @@ function drawPlayerSprite() {
     ctx.fillStyle = "#fff4cf"; circle(L.x, L.y, 1.6);
   }
   // clarão do tiro na ponta do cano
-  const w = curW();
   if (p.flashT > 0 && !w.melee) {
     const m = muzzlePoint(), ang = p.shotAng != null ? p.shotAng : p.angle;
-    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(m.x, m.y); ctx.rotate(ang);
-    ctx.fillStyle = "rgba(255,220,120,0.9)"; ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(18, 0); ctx.lineTo(0, 6); ctx.lineTo(4, 0); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,220,0.9)"; circle(2, 0, 4);
-    ctx.restore();
+    if (m) {
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(m.x, m.y); ctx.rotate(ang);
+      ctx.fillStyle = "rgba(255,220,120,0.9)"; ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(18, 0); ctx.lineTo(0, 6); ctx.lineTo(4, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,220,0.9)"; circle(2, 0, 4);
+      ctx.restore();
+    }
+  }
+  return true;
+}
+
+// ---------- Zumbis humanoides com spritesheet (mesmo estilo e câmera) ----------
+const ZSHEET = { ok: false, sheets: {}, base: 86 };
+(function loadZombieSheets() {
+  const names = ["z_walker", "z_walker2", "z_runner", "z_brute", "z_hazmat"];
+  let n = 0;
+  for (const nm of names) { const im = new Image(); im.onload = () => { if (++n === names.length) ZSHEET.ok = true; }; im.src = `img/${nm}.png`; ZSHEET.sheets[nm] = im; }
+})();
+function zombieSheet(z) {
+  z.var = z.var == null ? Math.random() : z.var;
+  switch (z.type) {
+    case "walker": return z.var < 0.5 ? "z_walker" : "z_walker2";
+    case "runner": case "infected": return "z_runner";
+    case "brute": return "z_brute";
+    case "hazmat": return "z_hazmat";
+    case "spitter": return "z_walker2";
+    case "toxic": return "z_walker";
+    default: return null;
+  }
+}
+// desenha o zumbi com a spritesheet; devolve false se o tipo não tiver (cães, mutantes, chefes...)
+function drawZombieSprite(z) {
+  if (!ZSHEET.ok || save.classicChar || z.boss) return false;
+  const nm = zombieSheet(z); if (!nm) return false;
+  const big = nm === "z_brute", S = ZSHEET.base * (z.r / 13) / (big ? 1.4 : 1);
+  const row = sheetRow(Math.cos(z.angle), Math.sin(z.angle));
+  const TAU = Math.PI * 2, col = Math.floor((((z.anim || 0) % TAU) + TAU) % TAU / TAU * 8) % 8;
+  const lunge = z.lunge > 0 ? 5 : 0, x = z.x - S / 2 + Math.cos(z.angle) * lunge, y = z.y + 6 - S * 0.82 + Math.sin(z.angle) * lunge;
+  if (z.type === "toxic") ctx.filter = "hue-rotate(55deg) saturate(1.5)";
+  else if (z.type === "infected") ctx.filter = "brightness(0.8) contrast(1.15)";
+  ctx.drawImage(ZSHEET.sheets[nm], col * 128, row * 128, 128, 128, x, y, S, S);
+  ctx.filter = "none";
+  if (z.flash > 0) { ctx.save(); ctx.globalAlpha = 0.55; ctx.globalCompositeOperation = "lighter"; ctx.drawImage(ZSHEET.sheets[nm], col * 128, row * 128, 128, 128, x, y, S, S); ctx.restore(); }
+  if (z.type === "spitter") {
+    const pulse = 0.8 + 0.2 * Math.sin(game.time / 150);
+    ctx.fillStyle = `rgba(143,209,79,${0.75 * pulse})`; circle(z.x - Math.cos(z.angle) * 5, z.y - S * 0.42, 6 * pulse * S / 86);
+  }
+  const top = z.y - S * 0.72;
+  if (z.state === "chase") { ctx.fillStyle = "rgba(255,60,40,0.9)"; circle(z.x + Math.cos(z.angle) * 3, top + S * 0.08, 1.6); }
+  if (z.alertT > 0) txt("!", z.x, top - 6, 20, "#e03a2f", "center", true);
+  if (z.hp < z.maxHp) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(z.x - 13, top - 4, 26, 4);
+    ctx.fillStyle = "#c0392b"; ctx.fillRect(z.x - 13, top - 4, 26 * Math.max(0, z.hp / z.maxHp), 4);
   }
   return true;
 }
