@@ -13,7 +13,7 @@ namespace FronteiraMorta
     {
         public static GameManager I { get; private set; }
         public PlayerController player;
-        public Hud hud;
+        [System.NonSerialized] public Hud hud;
         public bool Paused { get; private set; }
         public float Darkness { get; private set; }
         public int Danger = 0;                    // 0 = área azul (fácil)
@@ -43,7 +43,8 @@ namespace FronteiraMorta
             if (cam == null) { var cg = new GameObject("Main Camera"); cg.tag = "MainCamera"; cam = cg.AddComponent<Camera>(); cg.AddComponent<AudioListener>(); }
             cam.clearFlags = CameraClearFlags.SolidColor;
             // sol: usa a luz direcional da cena (ou cria uma)
-            foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) if (l.type == LightType.Directional) { sun = l; break; }
+            sun = RenderSettings.sun;
+            if (sun == null) { var any = FindAnyObjectByType<Light>(); if (any != null && any.type == LightType.Directional) sun = any; }
             if (sun == null) { var sg = new GameObject("Sol"); sun = sg.AddComponent<Light>(); sun.type = LightType.Directional; }
             sun.shadows = LightShadows.Soft;
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Linear;
