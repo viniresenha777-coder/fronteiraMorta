@@ -23,6 +23,11 @@ namespace FronteiraMorta
         Light flashlight;
         Camera cam;
         float vy, cooldown, reloading, attackT, kick, aimYaw;
+        // personagem desenhado com a spritesheet da versão web
+        SpriteActor actor;
+        bool useSprites, movingNow;
+        float stepDist;
+        int sRow;
         WeaponDef shownWeapon;
         public Vector3 AimPoint { get; private set; }
         public WeaponInst Cur => slots[current];
@@ -35,9 +40,16 @@ namespace FronteiraMorta
             cc = GetComponent<CharacterController>();
             cc.height = 1.8f; cc.radius = 0.32f; cc.center = new Vector3(0, 0.9f, 0); cc.stepOffset = 0.35f;
             rig = HumanoidRig.Build(transform, BodyLook.Survivor());
+            useSprites = SpriteActor.Available("player_longa");
+            if (useSprites)
+            {
+                actor = gameObject.AddComponent<SpriteActor>();
+                actor.Init("player_longa");
+                rig.gameObject.SetActive(false);   // o boneco de peças fica só como reserva
+            }
             // lanterna presa no colete
             var fl = new GameObject("Lanterna");
-            fl.transform.SetParent(rig.torso, false);
+            fl.transform.SetParent(useSprites ? transform : rig.torso, false);
             fl.transform.localPosition = new Vector3(-0.1f, 0.42f, 0.16f);
             fl.transform.localEulerAngles = new Vector3(18, 0, 0);
             flashlight = fl.AddComponent<Light>();
@@ -69,7 +81,8 @@ namespace FronteiraMorta
             shownWeapon = d;
             if (weaponRoot != null) Destroy(weaponRoot.gameObject);
             weaponRoot = new GameObject("ModeloArma").transform;
-            if (d.Pose == ArmPose.Melee) { weaponRoot.SetParent(rig.handTip[1], false); weaponRoot.localEulerAngles = new Vector3(90, 0, 0); }
+            if (useSprites) { weaponRoot.SetParent(transform, false); actor.SetSheet(SheetFor(d.Pose)); }
+            else if (d.Pose == ArmPose.Melee) { weaponRoot.SetParent(rig.handTip[1], false); weaponRoot.localEulerAngles = new Vector3(90, 0, 0); }
             else
             {
                 weaponRoot.SetParent(rig.gunMount, false);
@@ -118,6 +131,8 @@ namespace FronteiraMorta
             Vector3 vel = moving ? dir.normalized * speed : Vector3.zero;
             vy = cc.isGrounded ? -1f : vy - 20f * dt;
             cc.Move((vel + Vector3.up * vy) * dt);
+            movingNow = moving;
+            if (moving) stepDist += speed * dt;
 
             // ---- mira: ponto do mouse no chão, na altura do peito
             var ray = cam.ScreenPointToRay(mouse.position.ReadValue());
@@ -153,8 +168,66 @@ namespace FronteiraMorta
 
             // ---- animação
             var d = CurDef;
-            if (d.Pose != ArmPose.Melee && d.Pose != ArmPose.Fists && weaponRoot != null) weaponRoot.localPosition = new Vector3(0, 0, -kick * 0.08f);
+            if (!useSprites && d.Pose != ArmPose.Melee && d.Pose != ArmPose.Fists && weaponRoot != null) weaponRoot.localPosition = new Vector3(0, 0, -kick * 0.08f);
             rig.Animate(dt, moving ? (sprint ? 1f : 0.75f) : 0f, sprint ? 11f : 8f, d.Pose, attackT, false, sprint ? 10 : 5, 1f, d.length);
+        }
+
+        static string SheetFor(ArmPose p)
+        {
+            switch (p)
+            {
+                case ArmPose.Long: return "player_longa";
+                case ArmPose.Heavy: return "player_pesada";
+                case ArmPose.Pistol: return "player_pistola";
+                case ArmPose.Melee: return "player_melee";
+                default: return "player_punhos";
+            }
+        }
+
+        static float[] PoseFor(ArmPose p)
+        {
+            switch (p)
+            {
+                case ArmPose.Long: return PoseData.Longa;
+                case ArmPose.Heavy: return PoseData.Pesada;
+                case ArmPose.Pistol: return PoseData.Pistola;
+                case ArmPose.Melee: return PoseData.Melee;
+                default: return PoseData.Punhos;
+            }
+        }
+
+        /// <summary>Desenha o personagem (spritesheet), põe a arma 3D nas mãos e a lanterna no peito.</summary>
+        void LateUpdate()
+        {
+            if (!useSprites || cam == null || actor == null) return;
+            var d = CurDef;
+            // direção pela mira, com folga para não tremer na divisa entre duas direções
+            if (Mathf.Abs(Mathf.DeltaAngle(sRow * 45f, aimYaw)) > 22.5f + 7f) sRow = SpriteActor.RowFromYaw(aimYaw);
+            int col = movingNow && !dead ? Mathf.FloorToInt(stepDist / 0.33f) % 8 : 1;
+            actor.SetFrame(sRow, col);
+            actor.Draw(cam);
+
+            float[] P = PoseFor(d.Pose);
+            int i = (sRow * 8 + col) * PoseData.Stride;
+            bool behind = P[i + 12] > 0.5f;
+            float toCam = behind ? -0.06f : 0.06f;
+            Vector3 A = actor.SheetToWorld(cam, P[i], P[i + 1], toCam);
+            Vector3 B = actor.SheetToWorld(cam, P[i + 2], P[i + 3], toCam);
+            Vector3 U = actor.SheetToWorld(cam, P[i + 4], P[i + 5], toCam);
+            Vector3 v = B - A;                                  // 1 m de arma, já com o escorço da câmera
+            if (d.melee && attackT > 0)                          // golpe: a lâmina varre em volta da mão
+                v = Quaternion.AngleAxis(Mathf.Lerp(-80f, 80f, 1f - attackT), cam.transform.forward) * v;
+            if (weaponRoot != null && v.sqrMagnitude > 1e-6f)
+            {
+                weaponRoot.position = A - v.normalized * kick * 0.05f;
+                Vector3 up = U - A; if (up.sqrMagnitude < 1e-6f) up = cam.transform.up;
+                weaponRoot.rotation = Quaternion.LookRotation(v.normalized, up.normalized);
+                weaponRoot.localScale = new Vector3(1f, 1f, Mathf.Clamp(v.magnitude, 0.2f, 1.2f));
+            }
+            // lanterna presa no colete
+            Vector3 C = actor.SheetToWorld(cam, P[i + 10], P[i + 11], 0.1f);
+            flashlight.transform.position = C;
+            flashlight.transform.rotation = Quaternion.Euler(16f, aimYaw, 0);
         }
 
         void Select(int i) { if (i == current) return; current = i; reloading = 0; RefreshWeapon(); }

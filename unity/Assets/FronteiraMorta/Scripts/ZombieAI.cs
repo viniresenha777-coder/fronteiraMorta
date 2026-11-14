@@ -11,6 +11,9 @@ namespace FronteiraMorta
         public float hp, maxHp, speed, damage, sight = 18f, attackRange = 1.25f, attackDelay = 1.1f;
         public bool Dead { get; private set; }
         HumanoidRig rig;
+        SpriteActor actor;          // desenho com a spritesheet da versão web
+        float stepDist;
+        string sheet;
         CharacterController cc;
         PlayerController player;
         float attackCd, alertT, wanderT, vy, flashT, deadT, lunge;
@@ -26,18 +29,26 @@ namespace FronteiraMorta
             BodyLook look;
             switch (t)
             {
-                case ZombieType.Runner: maxHp = 40; speed = 4.3f; damage = 8; look = BodyLook.Zombie(new Color(0.42f, 0.11f, 0.1f)); break;
-                case ZombieType.Brute: maxHp = 180; speed = 1.4f; damage = 22; attackRange = 1.6f; look = BodyLook.Zombie(new Color(0.24f, 0.24f, 0.24f), false, 1.35f); break;
-                case ZombieType.Hazmat: maxHp = 90; speed = 1.6f; damage = 12; look = BodyLook.Zombie(new Color(0.65f, 0.56f, 0.13f), true); break;
+                case ZombieType.Runner: maxHp = 40; speed = 4.3f; damage = 8; look = BodyLook.Zombie(new Color(0.42f, 0.11f, 0.1f)); sheet = "z_runner"; break;
+                case ZombieType.Brute: maxHp = 180; speed = 1.4f; damage = 22; attackRange = 1.6f; look = BodyLook.Zombie(new Color(0.24f, 0.24f, 0.24f), false, 1.35f); sheet = "z_brute"; break;
+                case ZombieType.Hazmat: maxHp = 90; speed = 1.6f; damage = 12; look = BodyLook.Zombie(new Color(0.65f, 0.56f, 0.13f), true); sheet = "z_hazmat"; break;
                 default:
                     maxHp = 60; speed = Random.Range(1.3f, 1.9f); damage = 10;
-                    look = BodyLook.Zombie(Random.value < 0.5f ? new Color(0.34f, 0.27f, 0.19f) : new Color(0.17f, 0.24f, 0.34f));
+                    bool b = Random.value < 0.5f;
+                    look = BodyLook.Zombie(b ? new Color(0.34f, 0.27f, 0.19f) : new Color(0.17f, 0.24f, 0.34f));
+                    sheet = b ? "z_walker" : "z_walker2";
                     break;
             }
             maxHp *= hpMul; hp = maxHp;
             float sc = look.scale;
             cc.height = 1.8f * sc; cc.radius = 0.32f * sc; cc.center = new Vector3(0, 0.9f * sc, 0); cc.stepOffset = 0.3f;
             rig = HumanoidRig.Build(transform, look);
+            if (SpriteActor.Available(sheet))
+            {
+                actor = gameObject.AddComponent<SpriteActor>();
+                actor.Init(sheet, type == ZombieType.Brute ? 1.15f : 1f);
+                rig.gameObject.SetActive(false);
+            }
             marker = Minimap.Marker(transform, new Color(0.95f, 0.25f, 0.2f), 1.6f);
             wanderDir = Quaternion.Euler(0, Random.Range(0, 360f), 0) * Vector3.forward;
             transform.rotation = Quaternion.LookRotation(wanderDir);
@@ -79,6 +90,12 @@ namespace FronteiraMorta
                 float t = Mathf.Clamp01(deadT / 0.45f);
                 rig.transform.localRotation = Quaternion.Euler(-88f * t * t, 0, 0);
                 rig.transform.localPosition = new Vector3(0, 0.12f * t, 0);
+                if (actor != null)
+                {
+                    actor.SetTint(Color.Lerp(Color.white, new Color(0.55f, 0.5f, 0.5f, Mathf.Clamp01(1.5f - deadT / 16f)), t));
+                    actor.Draw(Camera.main);
+                    actor.Lie(t);
+                }
                 if (deadT > 25f) Destroy(gameObject);
                 return;
             }
@@ -130,6 +147,14 @@ namespace FronteiraMorta
             float move01 = spd > 0.01f ? Mathf.Clamp01(spd / 2f) : 0f;
             float lean = type == ZombieType.Runner ? 24f : type == ZombieType.Brute ? 8f : 14f;
             rig.Animate(dt, move01, type == ZombieType.Runner ? 11f : 5.5f, ArmPose.Fists, 0, true, lean + lunge * 12f, type == ZombieType.Walker ? 0.45f : 1f);
+            if (actor != null)
+            {
+                stepDist += spd * dt;
+                int col = spd > 0.05f ? Mathf.FloorToInt(stepDist / (type == ZombieType.Runner ? 0.4f : 0.22f)) % 8 : 1;
+                actor.SetFrame(SpriteActor.RowFromYaw(transform.eulerAngles.y), col);
+                actor.SetTint(flashT > 0 ? new Color(1.6f, 1.4f, 1.4f) : Color.white);
+                actor.Draw(Camera.main);
+            }
         }
     }
 }
