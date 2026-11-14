@@ -1157,7 +1157,7 @@ function drawHUD() {
   const compact = save.hud === 1;
   ctx.globalAlpha = 1;
   // nome em cima do personagem
-  if (!game.over) hudT(playerName(), player.x - cam.x, player.y - cam.y - (useSpriteChar() ? 64 : 28), 10, "#8fe08a", "center", true);
+  if (!game.over) hudT(playerName(), player.x - cam.x, player.y - cam.y - (useSpriteChar() ? 54 : 28), 10, "#8fe08a", "center", true);
   // prédio do resgate: "SOS" piscando em cima do telhado (por cima da luz)
   const rb = !game.inside && rescueBuilding();
   if (rb) {

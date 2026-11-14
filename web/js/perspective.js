@@ -78,19 +78,31 @@ function drawBuildingTall(b, e) {
   ctx.restore();
 }
 
-// tudo que é alto, desenhado por cima do chão e das criaturas
+function drawLampTall(l, e) {
+  const top = proj(l.x, l.y, l.big ? 70 : 55, e);
+  ctx.strokeStyle = "#1c1c1c"; ctx.lineWidth = l.big ? 4 : 3; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(top.x, top.y); ctx.stroke();
+  ctx.fillStyle = "#2a2a2a"; circle(top.x, top.y, l.big ? 6 : 4.5);
+  ctx.fillStyle = isNight() ? "#ffe6a0" : "#9a9a90"; circle(top.x, top.y, l.big ? 3.5 : 2.5);
+}
+// pinta de trás (norte) para a frente (sul) pela linha do chão de cada coisa:
+// quem está na frente de um prédio aparece por cima da parede; quem está atrás fica escondido
+function drawSortedScene() {
+  const e = eye(), list = [];
+  for (const b of world.buildings) if (inView(b.x - 140, b.y - 40, b.w + 280, b.h + 260)) list.push({ y: b.y + b.h, f: () => drawBuildingTall(b, e) });
+  for (const l of world.lamps) if (inView(l.x - 80, l.y - 120, 160, 200)) list.push({ y: l.y, f: () => drawLampTall(l, e) });
+  for (const z of Zs()) if (inView(z.x - 60, z.y - 120, 120, 160)) list.push({ y: z.y, f: () => { drawZombie(z); drawZombieExtra(z); } });
+  const es = game.escort;
+  if (es && !game.over) list.push({ y: es.y, f: () => drawSurvivor(es.x, es.y, es.ang, es.walk, es.moving) });
+  if (!game.over) list.push({ y: player.y + 0.5, f: () => { if (!drawPlayerSprite()) drawPlayer(); } });
+  list.sort((a, b) => a.y - b.y);
+  for (const it of list) it.f();
+}
+// (compatibilidade) só prédios e postes
 function drawTall() {
   if (game.inside) return;
   const e = eye();
-  for (const l of world.lamps) {
-    if (!inView(l.x - 80, l.y - 120, 160, 200)) continue;
-    const top = proj(l.x, l.y, l.big ? 70 : 55, e);
-    ctx.strokeStyle = "#1c1c1c"; ctx.lineWidth = l.big ? 4 : 3; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(top.x, top.y); ctx.stroke();
-    ctx.fillStyle = "#2a2a2a"; circle(top.x, top.y, l.big ? 6 : 4.5);
-    ctx.fillStyle = isNight() ? "#ffe6a0" : "#9a9a90"; circle(top.x, top.y, l.big ? 3.5 : 2.5);
-  }
-  // prédios: de trás (norte) para a frente (sul)
+  for (const l of world.lamps) if (inView(l.x - 80, l.y - 120, 160, 200)) drawLampTall(l, e);
   const list = world.buildings.filter((b) => inView(b.x - 140, b.y - 40, b.w + 280, b.h + 260));
   list.sort((a, b) => a.y + a.h - (b.y + b.h));
   for (const b of list) drawBuildingTall(b, e);
@@ -121,7 +133,7 @@ function drawCanopiesP() {
 // ---------- Personagem: uma spritesheet por pose de arma (8 direções × 8 quadros, 128 px) ----------
 // O corpo vem sem arma; cada arma do jogo é desenhada nas mãos usando os pontos de
 // SPRITE_POSES (empunhadura, eixo da arma, mãos e lanterna), gerados em tools/gerar_variantes.py.
-const PSHEET = { ok: false, cell: 128, size: 86, footY: 0.82, stride: 12.5, sheets: {} };
+const PSHEET = { ok: false, cell: 128, size: 72, footY: 0.82, stride: 12.5, sheets: {} };
 const POSES = ["longa", "pesada", "pistola", "melee", "punhos"];
 (function loadPlayerSheets() {
   let n = 0;
@@ -236,7 +248,7 @@ function drawPlayerSprite() {
 }
 
 // ---------- Zumbis humanoides com spritesheet (mesmo estilo e câmera) ----------
-const ZSHEET = { ok: false, sheets: {}, base: 86 };
+const ZSHEET = { ok: false, sheets: {}, base: 72 };
 (function loadZombieSheets() {
   const names = ["z_walker", "z_walker2", "z_runner", "z_brute", "z_hazmat"];
   let n = 0;

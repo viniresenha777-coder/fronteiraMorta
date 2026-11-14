@@ -267,11 +267,15 @@ function draw() {
     ctx.strokeStyle = `rgba(255,255,255,${0.3 * (1 - f)})`; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(1, p.r * f), 0, Math.PI * 2); ctx.stroke();
   }
-  for (const z of Zs()) if (game.inside || inView(z.x - 40, z.y - 40, 80, 80)) { drawZombie(z); drawZombieExtra(z); }
-  drawProjectiles();
-  if (game.escort && !game.over) drawSurvivor(game.escort.x, game.escort.y, game.escort.ang, game.escort.walk, game.escort.moving);
-  if (!game.over && !drawPlayerSprite()) drawPlayer(); // spritesheet de 8 direções (ou o boneco clássico)
-  if (!game.inside) { drawTall(); drawCanopiesP(); drawSmoke(); } // câmera aérea com perspectiva
+  if (game.inside) {
+    for (const z of Zs()) { drawZombie(z); drawZombieExtra(z); }
+    drawProjectiles();
+    if (game.escort && !game.over) drawSurvivor(game.escort.x, game.escort.y, game.escort.ang, game.escort.walk, game.escort.moving);
+    if (!game.over && !drawPlayerSprite()) drawPlayer();
+  } else {
+    drawSortedScene(); // câmera inclinada: prédios, postes, zumbis e você ordenados pela profundidade (pés)
+    drawProjectiles(); drawCanopiesP(); drawSmoke();
+  }
   ctx.restore();
   if (GFX.on) {
     // luz, sombras, clima e efeitos no WebGL; o HUD vai na tela de cima (transparente)
