@@ -41,7 +41,7 @@ namespace FronteiraMorta
 
         public Vector3 Build()
         {
-            asphalt = Mat.Textured("asfalto", Mat.Noise(new Color(0.17f, 0.18f, 0.19f), 0.25f, 11), new Vector2(40, 40), 0.05f);
+            asphalt = Mat.Textured("asfalto", Mat.Noise(new Color(0.27f, 0.28f, 0.3f), 0.22f, 11), new Vector2(40, 40), 0.05f);
             tiles = Mat.Textured("ceramica", Mat.BlueTiles(), new Vector2(BW / 4f, BH / 4f), 0.25f);
             grass = Mat.Textured("grama", Mat.Noise(new Color(0.2f, 0.27f, 0.15f), 0.35f, 12), new Vector2(10, 10), 0.02f);
             dirt = Mat.Textured("terra", Mat.Noise(new Color(0.29f, 0.26f, 0.2f), 0.3f, 13), new Vector2(10, 10), 0.02f);

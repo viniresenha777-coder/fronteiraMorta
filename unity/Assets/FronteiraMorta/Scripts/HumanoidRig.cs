@@ -11,8 +11,8 @@ namespace FronteiraMorta
 
         public static BodyLook Survivor() => new BodyLook
         {
-            jacket = new Color(0.27f, 0.29f, 0.19f), jacketDark = new Color(0.19f, 0.21f, 0.13f), vest = new Color(0.2f, 0.19f, 0.16f),
-            pants = new Color(0.29f, 0.26f, 0.2f), boots = new Color(0.09f, 0.08f, 0.07f), skin = new Color(0.62f, 0.47f, 0.38f),
+            jacket = new Color(0.38f, 0.42f, 0.27f), jacketDark = new Color(0.29f, 0.32f, 0.2f), vest = new Color(0.27f, 0.26f, 0.22f),
+            pants = new Color(0.4f, 0.36f, 0.28f), boots = new Color(0.12f, 0.1f, 0.09f), skin = new Color(0.72f, 0.56f, 0.45f),
             head = new Color(0.12f, 0.13f, 0.15f), backpack = true, beanie = true
         };
 
@@ -117,7 +117,23 @@ namespace FronteiraMorta
         /// move01 = 0 parado .. 1 andando; stride = quanto avança a passada por segundo;
         /// attack = 0..1 durante um golpe (ou o tranco do tiro); lean = inclinação do tronco (graus).
         /// </summary>
-        public void Animate(float dt, float move01, float stride, ArmPose pose, float attack, bool zombie, float lean, float limp = 1f)
+        const float UPPER = 0.32f, LOWER = 0.33f;
+
+        /// <summary>IK de dois ossos: leva a mão até o ponto (no espaço do tronco), dobrando o cotovelo.</summary>
+        public void Reach(int i, Vector3 targetTorso)
+        {
+            Vector3 sp = shoulder[i].localPosition, d = targetTorso - sp;
+            float dist = Mathf.Clamp(d.magnitude, 0.12f, UPPER + LOWER - 0.002f);
+            float cosA = (UPPER * UPPER + dist * dist - LOWER * LOWER) / (2f * UPPER * dist);
+            float cosG = (UPPER * UPPER + LOWER * LOWER - dist * dist) / (2f * UPPER * LOWER);
+            float alpha = Mathf.Acos(Mathf.Clamp(cosA, -1f, 1f)) * Mathf.Rad2Deg;
+            float bend = 180f - Mathf.Acos(Mathf.Clamp(cosG, -1f, 1f)) * Mathf.Rad2Deg;
+            var aim = Quaternion.FromToRotation(Vector3.down, d.normalized);
+            shoulder[i].localRotation = aim * Quaternion.Euler(alpha, 0, 0);   // cotovelo cai para baixo
+            elbow[i].localRotation = Quaternion.Euler(-bend, 0, 0);             // antebraço sobe até a mão
+        }
+
+        public void Animate(float dt, float move01, float stride, ArmPose pose, float attack, bool zombie, float lean, float limp = 1f, float weaponLen = 0.8f)
         {
             phase += dt * stride * Mathf.Max(0.15f, move01);
             float s = Mathf.Sin(phase) * move01, c = Mathf.Cos(phase);
@@ -155,6 +171,16 @@ namespace FronteiraMorta
             }
             shoulder[0].localEulerAngles = sL; shoulder[1].localEulerAngles = sR;
             elbow[0].localEulerAngles = new Vector3(eL, 0, 0); elbow[1].localEulerAngles = new Vector3(eR, 0, 0);
+            // armas de fogo: as mãos vão até a arma (gatilho e guarda-mão)
+            if (!zombie && (pose == ArmPose.Long || pose == ArmPose.Heavy || pose == ArmPose.Pistol))
+            {
+                Vector3 m = gunMount.localPosition;
+                Vector3 right, left;
+                if (pose == ArmPose.Pistol) { right = m + new Vector3(0, -0.06f, 0.02f); left = m + new Vector3(-0.035f, -0.07f, 0f); }
+                else if (pose == ArmPose.Heavy) { right = m + new Vector3(0, -0.06f, 0.08f); left = m + new Vector3(0, -0.07f, weaponLen * 0.3f); }
+                else { right = m + new Vector3(0, -0.05f, 0.06f); left = m + new Vector3(0, -0.04f, weaponLen * 0.42f); }
+                Reach(1, right); Reach(0, left);
+            }
         }
     }
 }

@@ -18,7 +18,70 @@ namespace FronteiraMorta
         GameObject searchBar;
         readonly List<(string text, float time)> lines = new List<(string, float)>();
 
-        class Stat { public Image fill; public Text state, value; }
+        class Stat { public Image fill, ring, icon; public Text state, value; }
+
+        // ---------- ícones desenhados por código (64 x 64, brancos; a cor vem da Image) ----------
+        static Sprite MakeSprite(System.Func<float, float, bool> inside)
+        {
+            const int S = 64;
+            var t = new Texture2D(S, S, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var px = new Color[S * S];
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    int hits = 0;   // 2x2 amostras por pixel para suavizar a borda
+                    for (int sy = 0; sy < 2; sy++) for (int sx = 0; sx < 2; sx++)
+                        if (inside((x + 0.25f + sx * 0.5f) / S * 2f - 1f, (y + 0.25f + sy * 0.5f) / S * 2f - 1f)) hits++;
+                    px[y * S + x] = new Color(1, 1, 1, hits / 4f);
+                }
+            t.SetPixels(px); t.Apply();
+            return Sprite.Create(t, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        static bool InPoly(float x, float y, float[] p)
+        {
+            bool c = false;
+            for (int i = 0, j = p.Length / 2 - 1; i < p.Length / 2; j = i++)
+            {
+                float xi = p[i * 2], yi = p[i * 2 + 1], xj = p[j * 2], yj = p[j * 2 + 1];
+                if (((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) c = !c;
+            }
+            return c;
+        }
+
+        static Sprite circle, ringSprite;
+        static readonly Sprite[] icons = new Sprite[5];
+
+        static void MakeIcons()
+        {
+            if (circle != null) return;
+            circle = MakeSprite((x, y) => x * x + y * y <= 1f);
+            ringSprite = MakeSprite((x, y) => { float r = x * x + y * y; return r <= 1f && r >= 0.82f; });
+            // vida: coração
+            icons[0] = MakeSprite((x, y) => { float X = x * 1.25f, Y = y * 1.25f + 0.25f; float a = X * X + Y * Y - 1; return a * a * a - X * X * Y * Y * Y <= 0; });
+            // fome: garfo e faca
+            icons[1] = MakeSprite((x, y) =>
+                (x > -0.55f && x < -0.4f && y > -0.85f && y < 0.2f) ||
+                (y > 0.05f && y < 0.25f && x > -0.78f && x < -0.17f) ||
+                (y >= 0.2f && y < 0.8f && ((x > -0.78f && x < -0.66f) || (x > -0.53f && x < -0.42f) || (x > -0.29f && x < -0.17f))) ||
+                (x > 0.3f && x < 0.46f && y > -0.85f && y < 0.0f) ||
+                ((x - 0.42f) * (x - 0.42f) / 0.05f + (y - 0.42f) * (y - 0.42f) / 0.25f <= 1f && x > 0.2f));
+            // sede: gota
+            icons[2] = MakeSprite((x, y) => (x * x + (y + 0.25f) * (y + 0.25f) <= 0.36f) || InPoly(x, y, new[] { 0f, 0.85f, -0.52f, -0.05f, 0.52f, -0.05f }));
+            // energia: raio
+            icons[3] = MakeSprite((x, y) => InPoly(x, y, new[] { 0.15f, 0.9f, -0.5f, -0.1f, -0.05f, -0.1f, -0.2f, -0.9f, 0.5f, 0.15f, 0.05f, 0.15f }));
+            // infecção: três círculos com furo no meio
+            icons[4] = MakeSprite((x, y) =>
+            {
+                bool any = false;
+                for (int k = 0; k < 3; k++)
+                {
+                    float a = Mathf.PI / 2 + k * Mathf.PI * 2 / 3, cx = Mathf.Cos(a) * 0.38f, cy = Mathf.Sin(a) * 0.38f;
+                    if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= 0.2f) any = true;
+                }
+                return any && x * x + y * y > 0.03f;
+            });
+        }
 
         public Hud()
         {
@@ -30,7 +93,7 @@ namespace FronteiraMorta
             canvas = go.GetComponent<RectTransform>();
 
             string[] names = { "VIDA", "FOME", "SEDE", "ENERGIA", "INFECÇÃO" };
-            for (int i = 0; i < 5; i++) stats[i] = MakeStat(new Vector2(22 + i * 180, -14), names[i]);
+            for (int i = 0; i < 5; i++) stats[i] = MakeStat(new Vector2(22 + i * 180, -14), names[i], i);
             info = Label(new Vector2(22, -78), new Vector2(700, 80), 15, new Color(0.9f, 0.88f, 0.78f), TextAnchor.UpperLeft, new Vector2(0, 1));
             danger = Label(new Vector2(22, -136), new Vector2(500, 24), 15, new Color(0.3f, 0.48f, 0.85f), TextAnchor.UpperLeft, new Vector2(0, 1));
             log = Label(new Vector2(22, 168), new Vector2(760, 120), 16, new Color(0.91f, 0.78f, 0.29f), TextAnchor.LowerLeft, new Vector2(0, 0));
@@ -71,14 +134,21 @@ namespace FronteiraMorta
             return t;
         }
 
-        Stat MakeStat(Vector2 pos, string name)
+        Image Pic(Vector2 pos, Vector2 size, Sprite sp, Color c)
         {
+            var go = new GameObject("Icone"); var rt = go.AddComponent<RectTransform>(); rt.SetParent(canvas, false);
+            Anchor(rt, new Vector2(0, 1), pos, size);
+            var img = go.AddComponent<Image>(); img.sprite = sp; img.color = c; img.preserveAspect = true; return img;
+        }
+
+        Stat MakeStat(Vector2 pos, string name, int index)
+        {
+            MakeIcons();
             var s = new Stat();
-            // ícone (círculo escuro com a inicial)
-            var ic = new GameObject("Icone"); var irt = ic.AddComponent<RectTransform>(); irt.SetParent(canvas, false);
-            Anchor(irt, new Vector2(0, 1), pos + new Vector2(0, -6), new Vector2(30, 30));
-            ic.AddComponent<Image>().color = new Color(0, 0, 0, 0.55f);
-            var letter = Label(pos + new Vector2(0, -6), new Vector2(30, 30), 15, Color.white, TextAnchor.MiddleCenter, new Vector2(0, 1)); letter.text = name.Substring(0, 1);
+            // ícone num círculo escuro com anel na cor do estado
+            Pic(pos + new Vector2(0, -4), new Vector2(32, 32), circle, new Color(0, 0, 0, 0.6f));
+            s.ring = Pic(pos + new Vector2(0, -4), new Vector2(32, 32), ringSprite, Color.white);
+            s.icon = Pic(pos + new Vector2(7, -11), new Vector2(18, 18), icons[index], Color.white);
             s.state = Label(pos + new Vector2(38, 0), new Vector2(140, 18), 13, Color.white, TextAnchor.UpperLeft, new Vector2(0, 1));
             var bg = new GameObject("Barra"); var rt = bg.AddComponent<RectTransform>(); rt.SetParent(canvas, false);
             Anchor(rt, new Vector2(0, 1), pos + new Vector2(38, -19), new Vector2(124, 6));
@@ -96,6 +166,7 @@ namespace FronteiraMorta
             var s = stats[i];
             s.fill.rectTransform.sizeDelta = new Vector2(124 * Mathf.Clamp01(v / max), 0);
             s.fill.color = st.Item2; s.state.color = st.Item2; s.state.text = st.Item1;
+            s.ring.color = st.Item2; s.icon.color = st.Item2;
             s.value.text = $"{Mathf.Ceil(v)} / {max:0} ({Mathf.RoundToInt(100 * v / max)}%)";
         }
 

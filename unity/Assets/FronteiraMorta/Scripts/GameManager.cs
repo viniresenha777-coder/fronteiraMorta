@@ -90,12 +90,12 @@ namespace FronteiraMorta
             float sunUp = Mathf.Clamp01(Mathf.Sin((hour - 6f) / 12f * Mathf.PI));      // 0 de noite, 1 ao meio-dia
             Darkness = 1f - Mathf.SmoothStep(0, 1, Mathf.Clamp01(sunUp * 2.2f));
             sun.transform.rotation = Quaternion.Euler(Mathf.Lerp(12f, 62f, sunUp), 35f + hour * 6f, 0);
-            sun.intensity = Mathf.Lerp(0.06f, 1.15f, 1 - Darkness);
+            sun.intensity = Mathf.Lerp(0.15f, 2.1f, 1 - Darkness);
             sun.color = Color.Lerp(new Color(0.55f, 0.65f, 0.9f), new Color(1f, 0.95f, 0.85f), 1 - Darkness);
-            var fog = Color.Lerp(new Color(0.24f, 0.33f, 0.45f), new Color(0.04f, 0.06f, 0.1f), Darkness);   // neblina azulada
+            var fog = Color.Lerp(new Color(0.42f, 0.5f, 0.6f), new Color(0.06f, 0.09f, 0.15f), Darkness);   // neblina azulada
             RenderSettings.fogColor = fog; cam.backgroundColor = fog;
-            RenderSettings.fogStartDistance = 20f; RenderSettings.fogEndDistance = Mathf.Lerp(70f, 45f, Darkness);
-            RenderSettings.ambientLight = Color.Lerp(new Color(0.42f, 0.46f, 0.52f), new Color(0.07f, 0.09f, 0.14f), Darkness);
+            RenderSettings.fogStartDistance = 30f; RenderSettings.fogEndDistance = Mathf.Lerp(120f, 60f, Darkness);
+            RenderSettings.ambientLight = Color.Lerp(new Color(0.62f, 0.65f, 0.72f), new Color(0.13f, 0.16f, 0.24f), Darkness);
             foreach (var l in city.lamps) l.intensity = Darkness > 0.35f ? 2.2f * Darkness : 0f;
 
             if (player.dead)

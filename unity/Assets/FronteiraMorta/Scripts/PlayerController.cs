@@ -46,7 +46,7 @@ namespace FronteiraMorta
             var bulb = GameObject.CreatePrimitive(PrimitiveType.Cube);
             Destroy(bulb.GetComponent<Collider>());
             bulb.transform.SetParent(fl.transform, false); bulb.transform.localScale = new Vector3(0.06f, 0.05f, 0.05f);
-            bulb.GetComponent<Renderer>().sharedMaterial = Mat.Emissive(new Color(1f, 0.95f, 0.75f), 3f);
+            bulb.GetComponent<Renderer>().sharedMaterial = Mat.Emissive(new Color(1f, 0.95f, 0.75f), 1.2f);
             Minimap.Marker(transform, new Color(1f, 0.85f, 0.35f), 3.2f, true);
             ResetState();
         }
@@ -74,7 +74,7 @@ namespace FronteiraMorta
             {
                 weaponRoot.SetParent(rig.gunMount, false);
                 rig.gunMount.localPosition = d.Pose == ArmPose.Pistol ? new Vector3(0.02f, 0.42f, 0.5f)
-                                          : d.Pose == ArmPose.Heavy ? new Vector3(0.16f, 0.18f, 0.18f) : new Vector3(0.12f, 0.4f, 0.12f);
+                                          : d.Pose == ArmPose.Heavy ? new Vector3(0.08f, 0.22f, 0.12f) : new Vector3(0.15f, 0.46f, 0.04f);
             }
             muzzle = Weapons.BuildModel(d, weaponRoot);
         }
@@ -154,7 +154,7 @@ namespace FronteiraMorta
             // ---- animação
             var d = CurDef;
             if (d.Pose != ArmPose.Melee && d.Pose != ArmPose.Fists && weaponRoot != null) weaponRoot.localPosition = new Vector3(0, 0, -kick * 0.08f);
-            rig.Animate(dt, moving ? (sprint ? 1f : 0.75f) : 0f, sprint ? 11f : 8f, d.Pose, attackT, false, sprint ? 10 : 5);
+            rig.Animate(dt, moving ? (sprint ? 1f : 0.75f) : 0f, sprint ? 11f : 8f, d.Pose, attackT, false, sprint ? 10 : 5, 1f, d.length);
         }
 
         void Select(int i) { if (i == current) return; current = i; reloading = 0; RefreshWeapon(); }

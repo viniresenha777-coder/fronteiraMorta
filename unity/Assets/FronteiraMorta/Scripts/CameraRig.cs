@@ -7,7 +7,7 @@ namespace FronteiraMorta
     public class CameraRig : MonoBehaviour
     {
         public Transform target;
-        public float pitch = 55f, distance = 19f, fov = 38f, lookAhead = 0.12f, smooth = 6f;
+        public float pitch = 55f, distance = 16f, fov = 38f, lookAhead = 0.12f, smooth = 6f;
         static float shake;
         Camera cam;
         Vector3 pos;
