@@ -1,0 +1,64 @@
+# Gera o FronteiraMorta.exe sozinho e publica o zip nos Releases.
+#
+#  · Toda mudança enviada para a branch main (no jogo ou no launcher)
+#    atualiza o release "Versão mais recente" (tag ultima-versao).
+#  · Uma tag como v1.1 cria também um release com esse número.
+#  · Dá para rodar na mão em Actions > "Gerar .exe para Windows" > Run workflow.
+name: Gerar .exe para Windows
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "windows/**", ".github/workflows/windows-exe.yml"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-exe
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: windows/go.mod
+          cache-dependency-path: windows/go.sum
+
+      - name: Gerar o .exe
+        run: ./windows/build.sh
+
+      - name: Montar o zip
+        run: |
+          mkdir -p dist/FronteiraMorta
+          cp windows/FronteiraMorta.exe windows/LEIA-ME.txt dist/FronteiraMorta/
+          cd dist && zip -r -9 FronteiraMorta-Windows.zip FronteiraMorta
+
+      - name: Atualizar "Versão mais recente"
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ultima-versao --cleanup-tag --yes || true
+          git push origin :refs/tags/ultima-versao || true
+          gh release create ultima-versao dist/FronteiraMorta-Windows.zip \
+            --target "$GITHUB_SHA" --latest \
+            --title "Versão mais recente" \
+            --notes "Gerado automaticamente a partir do commit ${GITHUB_SHA::7}: $(git log -1 --pretty=%s)
+
+          Baixe o FronteiraMorta-Windows.zip, descompacte e abra o FronteiraMorta.exe (veja o LEIA-ME.txt)."
+
+      - name: Release da versão (tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/FronteiraMorta-Windows.zip \
+            --title "Versão ${GITHUB_REF_NAME#v}" --generate-notes \
+          || gh release upload "$GITHUB_REF_NAME" dist/FronteiraMorta-Windows.zip --clobber

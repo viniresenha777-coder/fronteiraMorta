@@ -1,0 +1,31 @@
+FRONTEIRA MORTA - versão para Windows
+=====================================
+
+COMO JOGAR
+- Copie a pasta para onde quiser (ex.: C:\Jogos\FronteiraMorta) e abra o FronteiraMorta.exe.
+- O jogo abre numa janela própria. Não usa navegador e não precisa de internet.
+- Requisitos: Windows 10 ou 11 (64 bits) com o "Microsoft Edge WebView2 Runtime",
+  que já vem instalado no Windows 10/11 atualizados. Se faltar, o jogo avisa.
+
+AVISO DO WINDOWS NA PRIMEIRA VEZ
+- Como o .exe não tem assinatura digital, o Windows pode mostrar
+  "O Windows protegeu o computador". Clique em "Mais informações" e depois em
+  "Executar assim mesmo".
+
+ONDE FICA O SAVE
+- %LOCALAPPDATA%\FronteiraMorta\save.json
+  (cole esse caminho na barra do Explorador de Arquivos para abrir a pasta)
+- O jogo grava por cima do save antigo:
+    · a cada troca de área (zona)
+    · a cada 1 minuto de jogo
+  e avisa nas mensagens do canto de baixo à direita: "Checkpoint: progresso salvo".
+- Ao abrir o jogo de novo, você volta do último checkpoint.
+- Ao morrer, a partida em andamento é apagada (o que não se perde ao morrer
+  continua salvo: banco, baú da base, implantes instalados, nível, etc.).
+- Para sair com tudo salvo: aperte Esc e clique em "Salvar e sair do jogo".
+  Na mesma tela há o botão "Salvar progresso" para salvar na hora.
+- Se fechar a janela pelo X, o que aconteceu desde o último checkpoint
+  (no máximo 1 minuto) não fica salvo.
+
+DESINSTALAR
+- Apague a pasta do jogo e a pasta %LOCALAPPDATA%\FronteiraMorta.
