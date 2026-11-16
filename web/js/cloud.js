@@ -56,5 +56,9 @@ const fmCloud = (() => {
     pending = operation.catch(() => {});
     return operation;
   }
-  return {login, write, read: () => snapshot};
+  async function resend(email) {
+    const target = encodeURIComponent(location.origin + location.pathname);
+    await request("/auth/v1/resend?redirect_to=" + target, "POST", {type: "signup", email});
+  }
+  return {login, resend, write, read: () => snapshot};
 })();

@@ -30,6 +30,7 @@ async function authenticate(name, password, registering) {
 const fields = loginForm.elements;
 function updateLoginMode() {
   const online = fields.mode.value === "cloud";
+  document.getElementById("resend").hidden = !online;
   fields.user.type = online ? "email" : "text";
   fields.user.maxLength = online ? 254 : 32;
   fields.user.pattern = online ? ".*" : "[a-zA-Z0-9_]{1,32}";
@@ -41,6 +42,20 @@ function updateLoginMode() {
 }
 fields.mode.addEventListener("change", updateLoginMode);
 updateLoginMode();
+document.getElementById("resend").addEventListener("click", async event => {
+  if (fields.mode.value !== "cloud" || !fields.user.reportValidity()) return;
+  const button = event.currentTarget;
+  const status = loginForm.querySelector("[role=status]");
+  button.disabled = true;
+  try {
+    await fmCloud.resend(fields.user.value.trim());
+    status.textContent = "Se a confirmação estiver pendente, abra o e-mail mais recente.";
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
 
 loginForm.addEventListener("submit", async event => {
   event.preventDefault();
