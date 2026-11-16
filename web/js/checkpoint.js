@@ -85,14 +85,17 @@ function saveAndQuit() {
     }
     game.paused = false;
     game.quitting = true;
-    if (NATIVE && typeof window.fmQuit === "function") setTimeout(() => window.fmQuit(), 150);
+    if (NATIVE && typeof window.fmQuit === "function") {
+      setTimeout(() => window.fmQuit(), 150);
+    } else {
+      window.location.reload();
+    }
   });
 }
 function drawQuitScreen() {
   ctx.fillStyle = "rgba(6,7,5,0.94)"; ctx.fillRect(0, 0, W, H);
   txt("Progresso salvo", W / 2, H / 2 - 40, 40, "#f2eedc", "center", true);
-  txt(NATIVE ? "Fechando o jogo..." : "Você já pode fechar esta aba com segurança.", W / 2, H / 2, 16, "#a9a58f", "center");
-  if (!NATIVE) btn(W / 2 - 110, H / 2 + 34, 220, 42, "Voltar ao jogo", () => { game.quitting = false; }, true);
+  txt(NATIVE ? "Fechando o jogo..." : "Voltando ao login...", W / 2, H / 2, 16, "#a9a58f", "center");
 }
 // morreu: apaga o checkpoint da partida (o que não se perde ao morrer continua salvo)
 function clearRun() {
