@@ -54,4 +54,5 @@ function loadSave() {
   } catch (e) { /* sem armazenamento: o progresso vale só nesta sessão */ }
 }
 // no .exe o arquivo só é gravado nos checkpoints (troca de área e a cada 1 minuto)
-function persist() { if (NATIVE && localPlayer.owner) return; storeWrite(JSON.stringify(save)); }
+function persist() { if (NATIVE && localPlayer.owner && !localPlayer.cloud) return;
+  storeWrite(JSON.stringify(save)).catch(() => toast("Falha ao gravar o progresso. Confira a conexão e salve novamente.")); }

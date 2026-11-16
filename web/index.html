@@ -9,10 +9,15 @@
 <body>
 <form id="login">
   <h1>Fronteira Morta</h1>
-  <p>Entre para continuar sua partida neste navegador.</p>
-  <label>Usuário<input name="user" required maxlength="32" pattern="[a-zA-Z0-9_]{1,32}" title="Use letras, números ou sublinhado" autocomplete="username" autofocus></label>
+  <label>Modo de jogo<select name="mode"><option value="local">Local · neste navegador</option><option value="cloud">Online · entre computadores</option></select></label>
+  <label><span id="account-label">Usuário</span><input name="user" required maxlength="32" autocomplete="username" autofocus></label>
   <label>Senha<input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>
-  <button>Entrar</button><button name="register" value="yes">Criar conta local</button>
+  <label id="confirm-row" hidden>Confirme a senha<input name="confirmation" type="password" maxlength="128" autocomplete="new-password"></label>
+  <details id="migration" hidden><summary>Importar uma partida local</summary>
+    <label>Usuário local<input name="legacy" autocomplete="off"></label>
+    <label>Senha local<input name="legacyPassword" type="password" autocomplete="off"></label>
+  </details>
+  <button>Entrar</button><button name="register" value="yes">Criar conta</button>
   <p role="status" aria-live="polite"></p>
 </form>
 <main class="wrap" hidden>
@@ -29,7 +34,7 @@
 <script src="js/items.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/music.js"></script>
-<script src="js/save.js"></script>
+<script src="js/save.js?v=online1"></script>
 <script src="js/character.js"></script>
 <script src="js/world.js"></script>
 <script src="js/combat.js"></script>
@@ -40,7 +45,7 @@
 <script src="js/survival.js"></script>
 <script src="js/junk.js"></script>
 <script src="js/economy.js"></script>
-<script src="js/checkpoint.js?v=c1f7cee2ff"></script>
+<script src="js/checkpoint.js?v=online1"></script>
 <script src="js/render.js"></script>
 <script src="js/render_extra.js"></script>
 <script src="js/render_hub.js"></script>
@@ -49,6 +54,7 @@
 <script src="js/gl.js"></script>
 <script src="js/main.js"></script>
 </template>
-<script src="js/login.js"></script>
+<script src="js/cloud.js?v=online1"></script>
+<script src="js/login.js?v=online1"></script>
 </body>
 </html>

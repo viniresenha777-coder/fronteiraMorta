@@ -27,6 +27,21 @@ async function authenticate(name, password, registering) {
   return Object.freeze({name, owner});
 }
 
+const fields = loginForm.elements;
+function updateLoginMode() {
+  const online = fields.mode.value === "cloud";
+  fields.user.type = online ? "email" : "text";
+  fields.user.maxLength = online ? 254 : 32;
+  fields.user.pattern = online ? ".*" : "[a-zA-Z0-9_]{1,32}";
+  document.getElementById("account-label").textContent = online ? "E-mail" : "Usuário";
+  document.getElementById("migration").hidden = !online;
+  document.getElementById("confirm-row").hidden = true;
+  fields.confirmation.value = "";
+  loginForm.querySelector("[role=status]").textContent = "";
+}
+fields.mode.addEventListener("change", updateLoginMode);
+updateLoginMode();
+
 loginForm.addEventListener("submit", async event => {
   event.preventDefault();
   if (loginForm.dataset.busy) return;
@@ -37,13 +52,32 @@ loginForm.addEventListener("submit", async event => {
   status.textContent = "Verificando…";
   try {
     if (!crypto.subtle) throw new Error("Abra o jogo por HTTPS ou localhost para entrar.");
-    localPlayer = await authenticate(name, loginForm.elements.password.value, registering);
+    if (fields.mode.value === "cloud") {
+      if (registering && document.getElementById("confirm-row").hidden) {
+        document.getElementById("confirm-row").hidden = false;
+        fields.confirmation.focus();
+        throw Error("Confirme a senha e clique novamente em Criar conta.");
+      }
+      if (registering && (fields.password.value.length < 8 || fields.password.value !== fields.confirmation.value))
+        throw Error("Use pelo menos 8 caracteres e confirme a mesma senha.");
+      localPlayer = await fmCloud.login(name.trim(), fields.password.value, registering);
+      if (!localPlayer) throw Error("Confira seu e-mail para confirmar o cadastro. Depois use Entrar.");
+      if (fields.legacy.value.trim()) {
+        if (fmCloud.read() !== null) throw Error("Já existe uma partida online. Apague o campo Usuário local para continuar com ela.");
+        const legacy = await authenticate(fields.legacy.value.trim().toLowerCase(), fields.legacyPassword.value, false);
+        const old = localStorage.getItem(legacy.owner ? "fronteira-morta" : "fronteira-morta:save:" + legacy.name);
+        if (!old) throw Error("Nenhuma partida local encontrada neste navegador.");
+        await fmCloud.write(old);
+      }
+    } else {
+      localPlayer = await authenticate(name, fields.password.value, registering);
+    }
   } catch (error) {
     status.textContent = error instanceof DOMException || error instanceof SyntaxError ? "O armazenamento local está indisponível." : error.message;
     delete loginForm.dataset.busy;
     return;
   }
-  loginForm.elements.password.value = "";
+  fields.password.value = fields.confirmation.value = fields.legacyPassword.value = "";
   document.getElementById("admin-help").hidden = !localPlayer.owner;
   document.querySelector(".wrap").hidden = false;
   loginForm.hidden = true;

@@ -11,10 +11,12 @@ const NATIVE = typeof window !== "undefined" && !!window.__FM_NATIVE__;
 const CP_EVERY = 60000;
 
 function storeGet() {
+  if (localPlayer.cloud) return fmCloud.read();
   if (NATIVE && localPlayer.owner) return window.__FM_SAVE__ || null;
   try { return localStorage.getItem(SAVE_KEY); } catch (e) { return null; }
 }
 function storeWrite(str) {
+  if (localPlayer.cloud) return fmCloud.write(str);
   if (NATIVE && localPlayer.owner) {
     if (typeof window.fmSave !== "function") return Promise.reject(new Error("Gravador nativo indisponível"));
     return Promise.resolve().then(() => window.fmSave(str)).then(() => {
@@ -146,5 +148,8 @@ function restoreRun() {
 function checkpointTick(dt) {
   if (!game || game.over) return;
   game.cpT = (game.cpT || 0) + dt;
-  if (game.cpT >= CP_EVERY) checkpoint("1 minuto");
+  if (game.cpT >= CP_EVERY) {
+    game.cpT = 0;
+    checkpoint("1 minuto");
+  }
 }
