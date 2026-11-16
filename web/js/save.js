@@ -3,7 +3,7 @@
 //  Progresso que não se perde ao morrer: banco, baú da base (armas e
 //  materiais), implantes instalados, personagem, missões, colete e postos.
 // =====================================================================
-const SAVE_KEY = "fronteira-morta";
+const SAVE_KEY = localPlayer.owner ? "fronteira-morta" : "fronteira-morta:save:" + localPlayer.name;
 const save = {
   bank: 0, vault: [], installed: [], credits: 0, gm: false, missions: [],
   vest: -1, outposts: OUTPOSTS.map((o, i) => i === 0), muted: false, hud: 0, skin: 0, cape: 0, prof: null, name: "", classicChar: false, vestDur: {}, music: true, gfx: 2,
@@ -54,4 +54,4 @@ function loadSave() {
   } catch (e) { /* sem armazenamento: o progresso vale só nesta sessão */ }
 }
 // no .exe o arquivo só é gravado nos checkpoints (troca de área e a cada 1 minuto)
-function persist() { if (NATIVE) return; storeWrite(JSON.stringify(save)); }
+function persist() { if (NATIVE && localPlayer.owner) return; storeWrite(JSON.stringify(save)); }

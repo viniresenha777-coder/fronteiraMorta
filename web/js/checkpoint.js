@@ -11,11 +11,11 @@ const NATIVE = typeof window !== "undefined" && !!window.__FM_NATIVE__;
 const CP_EVERY = 60000;
 
 function storeGet() {
-  if (NATIVE) return window.__FM_SAVE__ || null;
+  if (NATIVE && localPlayer.owner) return window.__FM_SAVE__ || null;
   try { return localStorage.getItem(SAVE_KEY); } catch (e) { return null; }
 }
 function storeWrite(str) {
-  if (NATIVE) {
+  if (NATIVE && localPlayer.owner) {
     if (typeof window.fmSave !== "function") return Promise.reject(new Error("Gravador nativo indisponível"));
     return Promise.resolve().then(() => window.fmSave(str)).then(() => {
       window.__FM_SAVE__ = str;

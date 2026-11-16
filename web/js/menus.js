@@ -230,9 +230,10 @@ function travelKey(k) {
 }
 
 // ---------- Painel de administrador (F2) ----------
-const adm = { god: false, infAmmo: false, noReq: false, noHunger: false, infStamina: false, freeze: false, dmg: 1, tier: 3, direct: false, shopAnywhere: false };
+const adm = { god: localPlayer.owner, infAmmo: false, noReq: false, noHunger: false, infStamina: false, freeze: false, dmg: 1, tier: 3, direct: false, shopAnywhere: false };
 const ADM_TABS = ["Geral", "Personagem", "Dinheiro e itens", "Armas", "Implantes"];
 function toggleAdmin() {
+  if (!localPlayer.owner) return;
   if (game.menu === "admin") { game.menu = null; game.input = null; return; }
   if (game.over) return;
   game.shop = false; game.input = null; game.menu = "admin";

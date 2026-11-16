@@ -501,6 +501,12 @@ function updateZombies(dt, k) {
       let ang = Math.atan2(dy, dx);
       if (z.detourT > 0) { z.detourT -= dt; ang += z.detourDir * 1.2; }
       step = z.speed * k;
+      // O errante cambaleia na aproximação e firma a passada perto da mordida.
+      if (z.type === "walker" && !z.boss && d > z.r + player.r + 12 && z.detourT <= 0) {
+        const sway = Math.sin(z.anim * 0.9);
+        ang += sway * 0.22;
+        step *= 1 + 0.14 * Math.cos(z.anim * 0.9);
+      }
       // cão recua depois de morder
       if (z.recoilT > 0) { z.recoilT -= dt; ang += Math.PI; step = z.speed * 0.6 * k; }
       // infectado desvia quando você mira nele
