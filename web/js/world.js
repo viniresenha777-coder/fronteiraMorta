@@ -493,6 +493,16 @@ function gotoCell(cell, pos) {
   resetRows();
   if (!cell.w) cell.w = makeArea(cell);
   world = cell.w;
+  // Reaplica os saques já abertos em áreas visitadas antes de fechar o jogo.
+  if (Array.isArray(cell._savedLoot)) {
+    world.lootList.forEach((item, index) => {
+      if (index < cell._savedLoot.length) {
+        item.opened = !!cell._savedLoot[index];
+        item.openedAt = item.opened ? game.time : 0;
+      }
+    });
+    cell._savedLoot = null;
+  }
   cell.visited = true;
   game.inside = null;
   const p = typeof pos === "function" ? pos(world) : pos;
