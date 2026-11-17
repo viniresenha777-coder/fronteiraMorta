@@ -16,7 +16,7 @@ const HUB_ROOMS = [
 ];
 
 function openStation(kind) {
-  mouse.down = false;
+  mouse.down = false; game.clicks = [];   // o clique seguinte só vale para o que for desenhado depois
   if (kind === "exit") { leaveHouse(); return; }
   if (kind === "shopc") { openShop(); return; }
   if (kind === "junk") { game.menu = "junk"; game.jcur = 0; game.jconfirm = null; return; }
@@ -147,12 +147,54 @@ function drawHubRoom(r) {
   regClick(x, y, w, h, () => openStation(r.kind));
 }
 
+// Arte da base (img/hub.png): uma imagem só com os 9 painéis numa grade 3x3, na mesma ordem de HUB_ROOMS
+// (os nomes já vêm escritos na arte). Sem o arquivo, o jogo desenha as salas antigas.
+// Arte original em alta resolução (sem miniatura em base64).
+const CREDIT_SHOP_BUTTON_ART = new Image();
+CREDIT_SHOP_BUTTON_ART.src = "img/loja_creditos_highres.webp?v=20261116-crbutton2";
+
+const FM_BASE_INTERIOR_BG = new Image();
+FM_BASE_INTERIOR_BG.src = "img/fm_interior.webp?v=20261116-interior2";
+
+const HUB_ART = new Image();
+HUB_ART.onerror = () => { HUB_ART.bad = true; };
+HUB_ART.src = "img/hub.png";
+// onde fica cada coluna e cada linha de painéis, em fração da largura/altura da imagem
+const HUB_COLS = [[0.012, 0.325], [0.349, 0.658], [0.682, 0.988]], HUB_ROWS = [[0.017, 0.315], [0.343, 0.640], [0.666, 0.974]];
+function drawHubArt() {
+  if (HUB_ART.bad || !HUB_ART.complete || !HUB_ART.naturalWidth) return false;
+  const bx = 282, by = 56, bw = 668, bh = 452;
+  const k = Math.min(bw / HUB_ART.naturalWidth, bh / HUB_ART.naturalHeight), w = HUB_ART.naturalWidth * k, h = HUB_ART.naturalHeight * k;
+  const x = bx + (bw - w) / 2, y = by + (bh - h) / 2;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(HUB_ART, x, y, w, h);
+  HUB_ROOMS.forEach((r, i) => {
+    const c = HUB_COLS[i % 3], rw = HUB_ROWS[Math.floor(i / 3)];
+    const rx = x + c[0] * w, ry = y + rw[0] * h, rW = (c[1] - c[0]) * w, rH = (rw[1] - rw[0]) * h;
+    const hov = r.kind !== "shopc" && !game.menu && !game.shop && !game.found && mouse.x >= rx && mouse.x <= rx + rW && mouse.y >= ry && mouse.y <= ry + rH;
+    if (hov) {
+      ctx.fillStyle = "rgba(255,217,106,0.10)"; ctx.fillRect(rx, ry, rW, rH);
+      ctx.strokeStyle = "#ffd96a"; ctx.lineWidth = 2; ctx.strokeRect(rx + 1, ry + 1, rW - 2, rH - 2);
+    }
+    regClick(rx, ry, rW, rH, () => openStation(r.kind));
+  });
+  return true;
+}
+
 function drawHub() {
   const h = game.inside;
   ctx.fillStyle = "#0b0c0a"; ctx.fillRect(0, 0, W, H);
+  // Arte original do interior do abrigo: atrás dos painéis e das salas.
+  if (FM_BASE_INTERIOR_BG.complete && FM_BASE_INTERIOR_BG.naturalWidth) {
+    ctx.save();
+    ctx.globalAlpha = 0.78;
+    ctx.drawImage(FM_BASE_INTERIOR_BG, 0, 0, W, H);
+    ctx.restore();
+  }
   const vg = ctx.createRadialGradient(610, 300, 60, 610, 300, 520);
-  vg.addColorStop(0, "#22231e"); vg.addColorStop(1, "#0b0c0a");
-  ctx.fillStyle = vg; ctx.fillRect(262, 40, W - 262, H - 40);
+  vg.addColorStop(0, "rgba(32,33,29,0.26)");
+  vg.addColorStop(1, "rgba(7,9,8,0.62)");
+  ctx.fillStyle = vg; ctx.fillRect(0, 39, W, H - 39);
 
   // barra de cima
   ctx.fillStyle = "#17150f"; ctx.fillRect(0, 0, W, 38);
@@ -160,11 +202,32 @@ function drawHub() {
   shadowTxt(h.name.toUpperCase(), 272, 26, 20, "#c8483a", "left", true);
   txt(`Mochila $${game.money}  ·  Banco $${save.bank}  ·  Créditos ${save.credits}`, W - 140, 24, 12, "#c9c4ad", "right", true);
   btn(W - 128, 6, 118, 26, "Sair (E)", () => leaveHouse());
+  // Acesso à Loja de Créditos no canto superior esquerdo da base.
+  // Imagem original do botão no mesmo ponto do cabeçalho (não criar novo link lateral).
+  const cbx = 6, cby = 2, cbw = 144, cbh = 34;
+  const creditHover = mouse.x >= cbx && mouse.x <= cbx + cbw && mouse.y >= cby && mouse.y <= cby + cbh;
+  if (CREDIT_SHOP_BUTTON_ART.complete && CREDIT_SHOP_BUTTON_ART.naturalWidth) {
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(CREDIT_SHOP_BUTTON_ART, cbx, cby, cbw, cbh);
+    if (creditHover) {
+      ctx.strokeStyle = "#ffd96a"; ctx.lineWidth = 1.5;
+      ctx.strokeRect(cbx + 1, cby + 1, cbw - 2, cbh - 2);
+    }
+    regClick(cbx, cby, cbw, cbh, () => {
+      game.menu = "creditshop"; game.creditCur = 0; game.creditConfirm = null; game.cur = 0;
+    });
+  } else {
+    btn(cbx, cby + 3, cbw, 28, "Créditos", () => {
+      game.menu = "creditshop"; game.creditCur = 0; game.creditConfirm = null; game.cur = 0;
+    }, true);
+  }
 
   // planta da base
-  ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(290, 82, 552, 412);
-  ctx.strokeStyle = "#3d3a33"; ctx.lineWidth = 3; ctx.strokeRect(290, 82, 552, 412);
-  for (const r of HUB_ROOMS) drawHubRoom(r);
+  if (!drawHubArt()) {
+    ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(290, 82, 552, 412);
+    ctx.strokeStyle = "#3d3a33"; ctx.lineWidth = 3; ctx.strokeRect(290, 82, 552, 412);
+    for (const r of HUB_ROOMS) drawHubRoom(r);
+  }
   txt("Clique numa sala para usar · Esc ou E volta para a rua", 566, 520, 12, "#8a8672", "center");
   if (inSafe() && player.hp < player.maxHp) txt("Descansando na base: a vida volta aos poucos", 566, 540, 12, "#6fd06a", "center");
 
@@ -176,7 +239,7 @@ function drawHub() {
   links.forEach(([label, m], i) => {
     const ly = 64 + i * 17, hov = mouse.x >= px + 10 && mouse.x <= px + 180 && mouse.y >= ly - 12 && mouse.y <= ly + 4;
     txt(label, px + 12, ly, 12, hov ? "#ffd96a" : "#f2eedc", "left", true);
-    regClick(px + 10, ly - 12, 170, 16, () => { game.menu = m; game.cur = 0; if (m === "map") game.mapSel = { cx: world.cell.cx, cy: world.cell.cy }; if (m === "obj") game.oscroll = 0; });
+    regClick(px + 10, ly - 12, 170, 16, () => { game.menu = m; game.cur = 0; if (m === "creditshop") { game.creditCur = 0; game.creditConfirm = null; } if (m === "map") game.mapSel = { cx: world.cell.cx, cy: world.cell.cy }; if (m === "obj") game.oscroll = 0; });
   });
   const skin = SKINS[save.skin] || SKINS[0];
   txt(playerName(), px + pw - 10, 64, 12, "#ffd96a", "right", true, 120);
@@ -186,12 +249,18 @@ function drawHub() {
 
   // retrato de frente (arte do personagem); capa aparece por trás dos ombros
   const cp = CAPES[save.cape | 0], hx = px + 74, hy = 214;
-  if (cp && cp.color) {
+  const cape = () => {
+    if (!cp || !cp.color || cape3d()) return;
     const sw = Math.sin(game.time / 400 + performance.now() / 700) * 3;
     ctx.fillStyle = shade(cp.color, -0.15); ctx.beginPath(); ctx.moveTo(hx - 26, hy - 58); ctx.lineTo(hx + 26, hy - 58); ctx.lineTo(hx + 44 + sw, hy + 62); ctx.lineTo(hx - 44 + sw, hy + 62); ctx.closePath(); ctx.fill();
     if (cp.trim) { ctx.fillStyle = cp.trim; ctx.fillRect(hx - 44 + sw, hy + 58, 88, 4); }
-  }
-  if (!drawSpr(skin.spr, hx, hy, 120, 196)) drawHero(hx, hy, 0.95);
+  };
+  // boneco 3D: arrastar gira; clicar abre o inventário. A capa vai atrás de frente e por cima de costas.
+  const openInv = () => { game.menu = "pack"; game.cur = 0; };
+  if (portraitView() === "front") cape();
+  if (!drawPortrait(hx, hy + 6, 128, 196, openInv) && !drawSpr(skin.spr, hx, hy, 120, 196)) drawHero(hx, hy, 0.95);
+  if (portraitView() === "back") cape();
+  regClick(px + 10, hy - 100, 128, 200, openInv);   // clicar no boneco abre o inventário
   const bx = px + 140, bw = pw - 152;
   hubBar(bx, 150, bw, "Vida", player.hp, player.maxHp, "#6fd06a");
   hubBar(bx, 182, bw, "Fome", player.hunger, 100, "#e0a040");
@@ -205,10 +274,27 @@ function drawHub() {
     if (vd < 100) regClick(bx, 296, bw, 16, repairVest);
   }
 
-  // bônus (só texto)
-  const bon = activeBonuses().slice(0, 4);
-  bon.forEach((b, i) => shadowTxt(b.text, px + 12, 330 + i * 15, 11, b.color, "left", true, pw - 24));
-  if (activeBonuses().length > 4) txt(`+${activeBonuses().length - 4} bônus`, px + 12, 330 + 4 * 15, 10, "#8a8672");
+  // Na base, exibir SOMENTE os três bônus de combate calculados com os
+  // atributos efetivos do personagem. XP/dinheiro/loot e outros bônus
+  // continuam disponíveis exclusivamente nas telas detalhadas do jogo.
+  const hubWeapon = curW();
+  const damageMultiplier = (1 + (player.fx.firepower || 0) / 100) *
+    dmgMult(hubWeapon) * (trindadeActive() ? 1.35 : 1);
+  const hubSlow = (player.flags.jugger ? 0 :
+    (save.vest >= 0 ? VESTS[save.vest].slow || 0 : 0) + (hubWeapon.slow || 0)) -
+    (player.fx.adren && player.hp / player.maxHp < 0.5 ? player.fx.adren : 0);
+  const sprintMultiplier = (1 + profVal("sprint")) *
+    (1 + ((player.fx.agility || 0) + vestSpeedBonus()) / 100) *
+    (1 + (A("agi") - 10) * 0.004) * (1 - hubSlow / 100) *
+    (trindadeActive() ? 1.35 : 1);
+  const signed = n => (n > 0 ? "+" : "") + n + "%";
+  const hubBonuses = [
+    ["Dano " + signed(Math.round((damageMultiplier - 1) * 100)), "#e89f80"],
+    ["Velocidade " + signed(Math.round((sprintMultiplier - 1) * 100)), "#85c5ff"],
+    ["Armadura " + Math.round(armorRed() * 100) + "%", "#a8d5a3"]
+  ];
+  hubBonuses.forEach(([label, color], i) =>
+    shadowTxt(label, px + 12, 330 + i * 19, 12, color, "left", true, pw - 24));
 
   // armas equipadas com a munição embaixo
   ctx.fillStyle = "#3d3220"; ctx.fillRect(px + 10, 404, pw - 20, 2);
@@ -261,6 +347,13 @@ function drawAreaMap(x, y, w, h) {
   // chefe da área
   const boss = zombies.find((z) => z.boss && z.hp > 0);
   if (boss) hudT("☠", X(boss.x), Y(boss.y) + 6, 16, "#ff4a3a", "center", true);
+  // Posição dos jogadores conectados nesta área.
+  for (const online of fmSocial.inSector()) {
+    const xOnline = X(online.x), yOnline = Y(online.y);
+    ctx.fillStyle = fmSocial.isFriend(online.uid) ? "#8fe0a8" : "#73ceff";
+    circle(xOnline, yOnline, 4.5);
+    hudT(online.name, xOnline, yOnline - 8, 10, "#e5e0c8", "center", true, 130);
+  }
   // você
   const pp = here ? game.exitPos : player;
   ctx.save(); ctx.translate(X(pp.x), Y(pp.y)); ctx.rotate(here ? -Math.PI / 2 : player.angle);

@@ -1,61 +1,108 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Fronteira Morta</title>
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070b0a">
+  <title>Fronteira Morta 2.0 · CARROS-10 — Entrar</title>
+  <link rel="stylesheet" href="css/style.css?v=20261116-visual-final8">
+  <link rel="stylesheet" href="css/auth.css?v=20261116-6">
+  <!-- Build identificável: POSTES-03, para diferenciar a versão publicada da versão em cache. -->
+  <!-- Rebuild GitHub Pages default address; no custom domain configured. -->
+  <!-- Re-publicação da versão 2.2.2 em 2026-11-16: sem alteração de mecânicas ou saves. -->
 </head>
 <body>
-<form id="login">
-  <h1>Fronteira Morta</h1>
-  <label>Modo de jogo<select name="mode"><option value="local">Local · neste navegador</option><option value="cloud">Online · entre computadores</option></select></label>
-  <label><span id="account-label">Usuário</span><input name="user" required maxlength="32" autocomplete="username" autofocus></label>
-  <label>Senha<input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>
-  <label id="confirm-row" hidden>Confirme a senha<input name="confirmation" type="password" maxlength="128" autocomplete="new-password"></label>
-  <details id="migration" hidden><summary>Importar uma partida local</summary>
-    <label>Usuário local<input name="legacy" autocomplete="off"></label>
-    <label>Senha local<input name="legacyPassword" type="password" autocomplete="off"></label>
-  </details>
-  <button>Entrar</button><button name="register" value="yes">Criar conta</button>
-  <button type="button" id="resend" hidden>Reenviar confirmação</button>
-  <p role="status" aria-live="polite"></p>
-</form>
-<main class="wrap" hidden>
-  <div class="stage">
-    <canvas id="gl" width="960" height="600" aria-hidden="true"></canvas>
-    <canvas id="game" width="960" height="600" aria-label="Fronteira Morta"></canvas>
-  </div>
-  <p class="help">WASD move · Shift corre · mouse mira · clique ataca · 1 2 3 ou roda do mouse trocam arma · R recarrega · segure E vasculha · E entra · B mochila · F come · G bebe · H kit · I antibiótico · C atributos · M mapa do setor · N mapa da cidade · O objetivos · Esc pausa e missões · Tab HUD compacto · J música · K som<span id="admin-help" hidden> · F2 painel de administrador</span></p>
-</main>
-<template id="scripts">
-<script src="js/config.js"></script>
-<script src="js/util.js"></script>
-<script src="js/sprites.js"></script>
-<script src="js/items.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/music.js"></script>
-<script src="js/save.js?v=online2"></script>
-<script src="js/character.js"></script>
-<script src="js/world.js"></script>
-<script src="js/combat.js"></script>
-<script src="js/interact.js"></script>
-<script src="js/menus.js"></script>
-<script src="js/inventory.js"></script>
-<script src="js/objectives.js"></script>
-<script src="js/survival.js"></script>
-<script src="js/junk.js"></script>
-<script src="js/economy.js"></script>
-<script src="js/checkpoint.js?v=online2"></script>
-<script src="js/render.js"></script>
-<script src="js/render_extra.js"></script>
-<script src="js/render_hub.js"></script>
-<script src="js/sprite_data.js"></script>
-<script src="js/perspective.js"></script>
-<script src="js/gl.js"></script>
-<script src="js/main.js"></script>
-</template>
-<script src="js/cloud.js?v=online2"></script>
-<script src="js/login.js?v=online2"></script>
+  <form id="login" class="fm-auth">
+    <div class="fm-auth-panel">
+      <p class="fm-auth-kicker">Sobreviva à fronteira</p>
+      <h1>FRONTEIRA MORTA</h1>
+      <p class="fm-auth-sub">Entre na sua conta para continuar de onde parou, mesmo em outro computador.</p>
+      <label for="login-email">E-mail
+        <input id="login-email" name="email" type="email" autocomplete="email" maxlength="254" placeholder="seu@email.com" required autofocus>
+      </label>
+      <label for="login-password">Senha
+        <input id="login-password" name="password" type="password" autocomplete="current-password" maxlength="128" placeholder="Sua senha" required>
+      </label>
+      <label id="confirm-row" for="login-confirm" hidden>Confirme a senha
+        <input id="login-confirm" name="confirmation" type="password" autocomplete="new-password" maxlength="128">
+      </label>
+      <label class="fm-import" id="import-row" hidden>
+        <input id="import-save" type="checkbox">
+        Importar o progresso antigo salvo neste navegador (apenas se minha conta ainda não tiver partida online).
+      </label>
+      <div class="fm-auth-actions">
+        <button type="submit" value="login" class="primary">Entrar</button>
+        <button type="submit" value="register" class="secondary">Criar conta</button>
+      </div>
+      <button type="button" id="forgot-password" class="textual">Esqueci minha senha</button>
+      <button type="button" id="resend-confirmation" class="textual">Reenviar confirmação de e-mail</button>
+      <button type="button" id="test-connection" class="textual">Testar conexão com o servidor</button>
+      <p id="login-status" role="status" aria-live="polite"></p>
+      <small>A autenticação é protegida pelo Supabase. Seu progresso é armazenado na sua conta. <strong>Conexão v2.3.1 — VIP no HUD · POSTES-03</strong></small>
+    </div>
+  </form>
+  <form id="forgot-form" class="fm-auth" hidden>
+    <div class="fm-auth-panel">
+      <p class="fm-auth-kicker">Segurança da conta</p>
+      <h1>RECUPERAR SENHA</h1>
+      <p class="fm-auth-sub">Informe seu e-mail cadastrado. Enviaremos um link que comprova que você tem acesso a essa caixa postal, antes de permitir uma nova senha.</p>
+      <label for="forgot-email">E-mail
+        <input id="forgot-email" type="email" name="email" autocomplete="email" maxlength="254" required placeholder="seu@email.com">
+      </label>
+      <div class="fm-auth-actions">
+        <button class="primary" type="submit">Enviar link de recuperação</button>
+        <button id="forgot-back" class="secondary" type="button">Voltar ao login</button>
+      </div>
+      <p id="forgot-status" role="status" aria-live="polite"></p>
+      <small>Por segurança, não informamos se o e-mail possui cadastro. A nova senha só poderá ser definida através do link recebido.</small>
+    </div>
+  </form>
+  <main class="wrap" hidden>
+    <div class="stage">
+      <canvas id="gl" width="960" height="600" aria-hidden="true"></canvas>
+      <canvas id="game" width="960" height="600" aria-label="Fronteira Morta"></canvas>
+    </div>
+    <p class="help">WASD andar · Shift correr · mouse mirar e atacar · 1 2 3 / roda trocar arma · R recarregar · E usar · B mochila · F comer · G beber · H kit · I antibiótico · C atributos · M mapa · N cidade · O objetivos · U amigos · Esc pausa e missões · J música · K som · I mensagens <span id="vip-footer" class="vip-footer" aria-live="off">VIP: carregando...</span> <span id="trindade-footer" class="trindade-footer" hidden aria-live="off"></span> <span id="fm-build" style="display:inline-block;margin-left:9px;padding:1px 6px;border:1px solid #7a906a;border-radius:4px;color:#d5e8bf;background:#172316;font-size:11px" title="Identifica a versão do jogo carregada no navegador">VERSÃO CARROS-10</span></p>
+  </main>
+  <template id="game-scripts">
+    <script src="js/config.js?v=20261116-sun150-clock10-v2"></script>
+    <script src="js/util.js"></script>
+    <script src="js/sprites.js"></script>
+    <script src="js/items.js?v=20261117-rifles-reload08"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/audio_assets.js?v=20261117-rifles-reload08"></script>
+    <script src="js/music.js"></script>
+    <script src="js/save.js?v=20261117-fm-3d-audio-final2"></script>
+    <script src="js/character.js?v=20261116-visual-implants-reset-final8"></script>
+    <script src="js/world.js?v=20261117-car-proportion10"></script>
+    <script src="js/props_data.js"></script>
+    <script src="js/models.js?v=20261117-car-collision-curb09"></script>
+    <script src="js/flashlight.js?v=20261116-sun150-clock10-v2"></script>
+    <script src="js/combat.js?v=20261117-car-collision-curb09"></script>
+    <script src="js/interact.js?v=20261116-visual-implants-reset-final8"></script>
+    <script src="js/menus.js?v=20261116-visual-implants-reset-final8"></script>
+    <script src="js/inventory.js?v=20261117-rifles-reload08"></script>
+    <script src="js/objectives.js"></script>
+    <script src="js/survival.js?v=20261116-fix1"></script>
+    <script src="js/social.js?v=20261116-fix1"></script>
+    <script src="js/shared_world.js?v=20261116-sun150-clock10-v2"></script>
+    <script src="js/junk.js?v=20261116-visual-implants-reset-final8"></script>
+    <script src="js/economy.js?v=20261116-mp2"></script>
+    <script src="js/checkpoint.js?v=20261116-visual-implants-reset-final8"></script>
+    <script src="js/admin_gifts.js?v=20261116-fix1"></script>
+    <script src="js/messages.js?v=20261116-fix1"></script>
+    <script src="js/render.js?v=20261117-rifles-reload08"></script>
+    <script src="js/render_extra.js?v=20261117-car-collision-curb09"></script>
+    <script src="js/render_hub.js?v=20261116-visual-implants-reset-final8"></script>
+    <script src="js/sprite_data.js"></script>
+    <script src="js/perspective.js?v=20261116-sun150-clock10-v2"></script>
+    <script src="js/paperdoll.js?v=20261116-trindade6"></script>
+    <script src="js/gl.js?v=20261116-sun150-clock10-v2"></script>
+    <script src="js/base_guards.js?v=20261116-guards1"></script>
+    <script src="js/main.js?v=20261117-car-collision-curb09"></script>
+  </template>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/cloud.js?v=20261116-mp1"></script>
+  <script src="js/login.js?v=20261116-6"></script>
 </body>
 </html>

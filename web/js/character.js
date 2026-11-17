@@ -4,65 +4,108 @@
 // =====================================================================
 
 // ---------- Implantes ----------
-function randomNeg(tier) {
-  const key = ["agility", "thick", "vigor", "reload"][Math.floor(Math.random() * 4)];
-  return { key, val: key === "vigor" ? -6 * tier : -2 * tier };
-}
-function randomImplant(boss) {
-  if (boss) {
-    const r0 = Math.random();
-    if (r0 < 0.05) return { id: "rabbit", tier: 1, neg: null };
-    if (r0 < 0.25) return { id: pick(["berserker", "phantom", "hoarder"]), tier: 1, neg: null };
+function newImplant(id) { return { id, alloc: {} }; }
+function randomImplant() { return newImplant(pick(IMP_IDS)); }
+function impColor(im) { return IMP_COLOR[IMP[im.id].kind || 0]; }
+function implantName(im) { return IMP[im.id].name; }
+function allocUsed(im) { let n = 0; for (const k in im.alloc || {}) n += im.alloc[k]; return n; }
+// save antigo ou mexido: só entra implante que existe, com os pontos dentro do limite
+function cleanImplant(im) {
+  if (!im || !IMP[im.id]) return null;
+  const d = IMP[im.id], out = newImplant(im.id);
+  if (d.alloc && im.alloc) {
+    let left = d.alloc.points;
+    for (const o of d.alloc.opts) { const n = Math.max(0, Math.min(left, im.alloc[o.key] | 0)); if (n) { out.alloc[o.key] = n; left -= n; } }
   }
-  const ids = Object.keys(IMP).filter((i) => !IMP[i].combo), id = pick(ids), r = Math.random();
-  const tier = boss ? (r < 0.15 ? 3 : r < 0.6 ? 2 : 1) : (r < 0.12 ? 2 : 1);
-  return { id, tier, neg: null };
+  return out;
 }
-function implantName(im) {
-  const d = IMP[im.id];
-  return d.combo ? d.name : `${d.name} T${im.tier}${im.neg ? " (Erro)" : ""}`;
+// efeitos de um implante (fixos + pontos distribuídos). O Mímico copia o da esquerda, com os negativos em dobro.
+function implantFx(im, i, list) {
+  const d = IMP[im.id], fx = {};
+  if (d.mimic) {
+    const left = list && i > 0 ? list[i - 1] : null;
+    if (!left || IMP[left.id].mimic) return fx;
+    const src = implantFx(left, i - 1, list);
+    for (const k in src) fx[k] = src[k] < 0 ? src[k] * 2 : src[k];
+    return fx;
+  }
+  for (const k in d.fx) fx[k] = d.fx[k];
+  if (d.alloc) for (const o of d.alloc.opts) { const n = (im.alloc && im.alloc[o.key]) || 0; if (n) fx[o.key] = (fx[o.key] || 0) + n * o.per; }
+  return fx;
 }
+function fxText(fx) { return Object.keys(fx).filter((k) => fx[k]).map((k) => `${sgn(fx[k])}% ${FX_LABEL[k] || k}`).join(" · "); }
 function implantDesc(im) {
-  const d = IMP[im.id];
-  if (d.combo) return d.text;
-  let t = d.text.replace("{v}", d.vals[im.tier - 1]);
-  if (im.neg) t += ` · Erro: ${NEGTXT[im.neg.key].replace("{v}", Math.abs(im.neg.val))}`;
-  return t;
-}
-function recalcImplants() {
-  const fx = {};
-  STAT_KEYS.forEach((k) => { fx[k] = 0; });
-  for (const im of save.installed) {
-    const d = IMP[im.id];
-    for (const k in d.fx) fx[k] += d.fx[k][Math.min(im.tier, d.fx[k].length) - 1];
-    if (im.neg) fx[im.neg.key] += im.neg.val;
+  const d = IMP[im.id], i = save.installed.indexOf(im), parts = [];
+  if (d.mimic) {
+    const left = i > 0 ? save.installed[i - 1] : null;
+    if (left && !IMP[left.id].mimic) parts.push(`Copiando ${implantName(left)}: ${fxText(implantFx(im, i, save.installed)) || "nada"}`);
+  } else {
+    const t = fxText(d.fx || {});
+    if (t) parts.push(t);
+    if (d.alloc) {
+      const a = {}; for (const o of d.alloc.opts) if (im.alloc && im.alloc[o.key]) a[o.key] = im.alloc[o.key] * o.per;
+      parts.push(`Pontos ${allocUsed(im)}/${d.alloc.points}${allocUsed(im) ? ": " + fxText(a) : " (arraste para o boneco para distribuir)"}`);
+    }
   }
+  if (d.text) parts.push(d.text);
+  return parts.join(" · ");
+}
+// por que este implante não pode ser instalado agora (ou null se pode)
+function installBlock(im) {
+  if (save.installed.some((x) => x.id === im.id)) return `Você já tem ${implantName(im)} instalado (só um de cada)`;
+  if (save.installed.length >= IMPL_SLOTS) return "Sem espaço: remova um implante primeiro";
+  return null;
+}
+function canSwapImplants() { return inSafe() || !!(player.flags && player.flags.hook); }
+function recalcImplants() {
+  const all = {}, safe = {}, flags = {};
+  STAT_KEYS.forEach((k) => { all[k] = 0; safe[k] = 0; });
+  save.installed.forEach((im, i) => {
+    const fx = implantFx(im, i, save.installed);
+    for (const k in fx) { all[k] = (all[k] || 0) + fx[k]; if (fx[k] > 0) safe[k] = (safe[k] || 0) + fx[k]; }
+    if (IMP[im.id].flag) flags[IMP[im.id].flag] = true;
+  });
   const pf = prof(); // bônus e penalidades da profissão
-  if (pf && pf.fx) for (const k in pf.fx) fx[k] += pf.fx[k];
-  player.fx = fx;
+  if (pf && pf.fx) for (const k in pf.fx) { all[k] = (all[k] || 0) + pf.fx[k]; safe[k] = (safe[k] || 0) + pf.fx[k]; }
+  player.fxAll = all; player.fxSafe = safe; player.flags = flags; player.fx = all;
   const vest = save.vest >= 0 ? VESTS[save.vest] : null;
-  player.maxHp = Math.max(30, 100 + 3 * (player.level - 1) + fx.vigor + (vest && vest.hp ? vest.hp : 0));
+  // Endurance vale a mesma quantidade em HP. Colete e implantes acrescentam
+  // pontos de vida até o limite absoluto de 200, sem bônus automático por nível.
+  const baseHp = Number.isFinite(player.attrs.endurance) ? player.attrs.endurance : 25;
+  const implantBonus = Math.max(-20, Math.min(35, all.vigor || 0));
+  const vestBonus = Math.max(0, Math.min(25, vest && vest.hp ? vest.hp : 0));
+  player.maxHp = Math.max(1, Math.min(PLAYER_HP_CAP, baseHp + implantBonus + vestBonus));
   player.hp = Math.min(player.hp, player.maxHp);
+  lastStandTick();
 }
-function makeStock() {
-  const singles = Object.keys(IMP).filter((i) => !IMP[i].combo).sort(() => Math.random() - 0.5).slice(0, 5);
-  const stock = singles.map((id) => ({ id, price: 180, sold: false }));
-  stock.push({ id: pick(["berserker", "phantom", "hoarder"]), price: 2500, sold: false });
-  if (new Date().getMonth() === 11) stock.push({ id: "rabbit", price: 5000, sold: false }); // evento de Natal
-  return stock;
+// Último Suspiro (Desafia-Morte): com a vida crítica, as penalidades dos implantes deixam de valer
+function lastStandTick() {
+  if (!player.fxAll) return;
+  player.fx = player.flags.lastStand && player.hp / player.maxHp < 0.25 ? player.fxSafe : player.fxAll;
 }
+function makeStock() { return IMP_IDS.map((id) => ({ id, price: IMP[id].price })); }
 
 // ---------- Atributos ----------
 function xpNeed(l) { return Math.round(30 + 6 * l + 0.12 * l * l); }
 function A(id) { return player.attrs[id]; }
-function armorRed() {
-  const a = A("armor") / (A("armor") + 150), v = save.vest >= 0 ? (VESTS[save.vest].armor / 100) * vestEff() : 0;
-  return 1 - (1 - a) * (1 - v);
+// Vest and implant protection stack additively; attribute armor remains a separate layer.
+function equipmentProtection() {
+  const vest = save.vest >= 0 ? (VESTS[save.vest].armor + vestUpgrade().armor) * vestEff() : 0;
+  return Math.max(-50, Math.min(95, vest + (player.fx.thick || 0)));
 }
-function moneyMult() { return (1 + player.fx.greed / 100) * (save.gm ? 2 : 1); }
-function xpMult() { return (1 + player.fx.exp / 100) * (save.gm ? 2 : 1); }
+function trindadeActive() { return (save.trindadeUntil || 0) > Date.now(); }
+function armorRed() {
+  const a = A("armor") / (A("armor") + 150);
+  const baseline = Math.min(0.78, 1 - (1 - a) * (1 - equipmentProtection() / 100));
+  const boosted = baseline * (trindadeActive() ? 1.35 : 1);
+  // Urso de Ferro tem teto próprio de 80% de redução total.
+  return Math.min(player.flags.jugger ? 0.8 : 0.95, boosted);
+}
+function moneyMult() { return (1 + player.fx.greed / 100) * (vipActive() ? 2 : 1); }
+function xpMult() { return (1 + player.fx.exp / 100) * (vipActive() ? 2 : 1); }
 function attrEffect(id, v) {
   switch (id) {
+    case "endurance": return `${Math.round(v)} de vida-base (melhorias até 200 HP)`;
     case "str": return `+${v - 10}% de dano melee · exigência das armas`;
     case "armor": return `-${Math.round((v / (v + 150)) * 100)}% de dano recebido`;
     case "agi": return `+${Math.round((v - 10) * 0.4)}% de velocidade`;
@@ -75,7 +118,7 @@ function attrEffect(id, v) {
   }
 }
 function syncChar() {
-  save.char.level = player.level; save.char.xp = player.xp; save.char.points = player.points; save.char.wpoints = player.wpoints;
+  save.char.level = player.level; save.char.xp = player.xp; save.char.points = player.points; save.char.wpoints = player.wpoints; save.char.skillCurve = 2;
   persist();
 }
 function gainXp(n) {
@@ -84,7 +127,9 @@ function gainXp(n) {
   let up = 0;
   while (player.level < MAX_LEVEL && player.xp >= xpNeed(player.level)) {
     player.xp -= xpNeed(player.level); player.level++;
-    const pts = player.level <= 50 ? 5 : 2; player.points += pts; player.wpoints += pts; up++;
+    player.wpoints += weaponPointsForLevel(player.level);
+    player.points += survivalPointsForLevel(player.level);
+    up++;
   }
   if (player.level >= MAX_LEVEL) player.xp = 0;
   if (up) {

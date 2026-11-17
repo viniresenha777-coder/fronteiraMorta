@@ -32,26 +32,39 @@ function killBounty(z) {
 
 // ---------- Nome do jogador ----------
 const NAME_MIN = 3, NAME_MAX = 16;
-function openNameScreen(rename) { game.menu = "name"; game.nameDraft = rename && save.name ? save.name : ""; game.nameRename = !!rename; }
+function openNameScreen(rename) {
+  // O nome é definido somente na criação do personagem; não existe renomear.
+  if (rename && save.name) return;
+  game.menu = "name"; game.nameDraft = ""; game.nameRename = false; game.nameBusy = false;
+}
 function nameKey(k) {
+  if (game.nameBusy) return;
   const raw = game.rawKey || "";
   let d = game.nameDraft || "";
   if (k === "backspace") d = d.slice(0, -1);
   else if (k === "enter") { confirmName(); return; }
-  else if (k === "escape" && game.nameRename) { game.menu = null; return; }
-  else if (raw.length === 1 && /[\p{L}\p{N} _\-.]/u.test(raw) && d.length < NAME_MAX) d += raw;
+  else if (raw.length === 1 && /[\p{L}\p{N} _.-]/u.test(raw) && d.length < NAME_MAX) d += raw;
   game.nameDraft = d.replace(/^\s+/, "");
 }
-function confirmName() {
+async function confirmName() {
+  if (game.nameBusy) return;
   const n = (game.nameDraft || "").trim().replace(/\s+/g, " ");
   if (n.length < NAME_MIN) { toast(`O nome precisa ter pelo menos ${NAME_MIN} letras`); return; }
-  save.name = n; persist();
-  game.menu = save.prof ? null : "prof";
-  toast(`Bem-vindo, ${n}!`);
+  game.nameBusy = true;
+  try {
+    // Registra um nome único no Supabase ANTES de gravá-lo no save.
+    const registered = await fmSocial.claimName(n);
+    save.name = registered; persist();
+    game.menu = save.prof ? null : "prof";
+    toast(`Bem-vindo, ${registered}!`);
+    fmSocial.start().catch(console.warn);
+  } catch (err) {
+    toast(err.message || "Não foi possível registrar esse nome.");
+  } finally { game.nameBusy = false; }
 }
 function drawNameScreen() {
   ctx.fillStyle = "rgba(8,9,7,0.97)"; ctx.fillRect(0, 0, W, H);
-  txt(game.nameRename ? "Trocar o nome" : "Crie o seu sobrevivente", W / 2, 120, 32, "#e5e0c8", "center", true);
+  txt("Crie o seu sobrevivente", W / 2, 120, 32, "#e5e0c8", "center", true);
   txt("Escolha o nome que vai aparecer em cima do seu personagem", W / 2, 152, 14, "#a9a58f", "center");
   const bx = W / 2 - 220, by = 200, bw = 440, bh = 60, d = game.nameDraft || "";
   ctx.fillStyle = "#14130f"; rr(bx, by, bw, bh, 10); ctx.fill();
@@ -60,9 +73,8 @@ function drawNameScreen() {
   txt(d ? d + caret : caret, bx + 20, by + 40, 26, d ? "#ffd96a" : "#6d6a58", "left", true, bw - 40);
   if (!d) txt("digite o nome...", bx + 34, by + 39, 18, "#55534a", "left");
   txt(`${d.length}/${NAME_MAX} · letras, números, espaço, _ - .`, W / 2, by + bh + 22, 12, d.length && d.trim().length < NAME_MIN ? "#e07b5a" : "#8a8672", "center");
-  btn(W / 2 - 110, by + 110, 220, 46, "Confirmar (Enter)", confirmName, true, d.trim().length < NAME_MIN);
-  if (game.nameRename) btn(W / 2 - 110, by + 166, 220, 38, "Cancelar (Esc)", () => { game.menu = null; });
-  if (!game.nameRename) txt("Depois você escolhe a profissão", W / 2, by + 190, 12, "#8a8672", "center");
+  btn(W / 2 - 110, by + 110, 220, 46, game.nameBusy ? "Registrando..." : "Confirmar (Enter)", confirmName, true, d.trim().length < NAME_MIN || game.nameBusy);
+  txt("Depois você escolhe a profissão · o nome será definitivo", W / 2, by + 190, 12, "#8a8672", "center");
   if (game.msgT > 0) txt(game.msg, W / 2, H - 60, 15, "#ffd96a", "center", true);
 }
 function playerName() { return save.name || "Sobrevivente"; }

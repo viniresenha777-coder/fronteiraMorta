@@ -1,115 +1,199 @@
 "use strict";
-let localPlayer;
+// O jogo só é carregado depois da autenticação e da leitura do save online.
 const loginForm = document.getElementById("login");
-const ownerLogin = { salt: "4c5a2300ca011aa66bf4aea3daf6358c", hash: "e21a844ea40e50a55349f16228596c47183f710b64b667a97201027bbbc1968a" };
+const statusEl = document.getElementById("login-status");
+const emailEl = document.getElementById("login-email");
+const passwordEl = document.getElementById("login-password");
+const confirmRow = document.getElementById("confirm-row");
+const confirmEl = document.getElementById("login-confirm");
+const importRow = document.getElementById("import-row");
+const importEl = document.getElementById("import-save");
+let starting = false;
+let loaded = false;
 
-async function passwordHash(password, salt) {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({name: "PBKDF2", hash: "SHA-256", iterations: 600000, salt: encoder.encode(salt)}, key, 256);
-  return Array.from(new Uint8Array(bits), n => n.toString(16).padStart(2, "0")).join("");
+function loginStatus(message, bad = false) {
+  statusEl.textContent = message;
+  statusEl.classList.toggle("error", bad);
 }
-
-async function authenticate(name, password, registering) {
-  const owner = name === "marcos";
-  const key = "fronteira-morta:login:" + name;
-  const record = owner ? ownerLogin : JSON.parse(localStorage.getItem(key));
-  if (registering) {
-    if (record) throw new Error("Este usuário já existe. Use Entrar.");
-    if (password.length < 8) throw new Error("Escolha uma senha com pelo menos 8 caracteres.");
-    const salt = crypto.randomUUID();
-    const hash = await passwordHash(password, salt);
-    if (localStorage.getItem(key)) throw new Error("Este usuário já existe. Use Entrar.");
-    localStorage.setItem(key, JSON.stringify({ salt, hash }));
-  } else if (!record || await passwordHash(password, record.salt) !== record.hash) {
-    throw new Error("Usuário ou senha incorretos.");
-  }
-  return Object.freeze({name, owner});
+function loginBusy(busy) {
+  starting = busy;
+  for (const button of loginForm.querySelectorAll("button")) button.disabled = busy;
 }
-
-const fields = loginForm.elements;
-function updateLoginMode() {
-  const online = fields.mode.value === "cloud";
-  document.getElementById("resend").hidden = !online;
-  fields.user.type = online ? "email" : "text";
-  fields.user.maxLength = online ? 254 : 32;
-  fields.user.pattern = online ? ".*" : "[a-zA-Z0-9_]{1,32}";
-  document.getElementById("account-label").textContent = online ? "E-mail" : "Usuário";
-  document.getElementById("migration").hidden = !online;
-  document.getElementById("confirm-row").hidden = true;
-  fields.confirmation.value = "";
-  loginForm.querySelector("[role=status]").textContent = "";
-}
-fields.mode.addEventListener("change", updateLoginMode);
-updateLoginMode();
-document.getElementById("resend").addEventListener("click", async event => {
-  if (fields.mode.value !== "cloud" || !fields.user.reportValidity()) return;
-  const button = event.currentTarget;
-  const status = loginForm.querySelector("[role=status]");
-  button.disabled = true;
-  try {
-    await fmCloud.resend(fields.user.value.trim());
-    status.textContent = "Se a confirmação estiver pendente, abra o e-mail mais recente.";
-  } catch (error) {
-    status.textContent = error.message;
-  } finally {
-    button.disabled = false;
-  }
-});
-
-loginForm.addEventListener("submit", async event => {
-  event.preventDefault();
-  if (loginForm.dataset.busy) return;
-  loginForm.dataset.busy = "1";
-  const status = loginForm.querySelector("[role=status]");
-  const name = loginForm.elements.user.value.toLowerCase();
-  const registering = event.submitter?.name === "register";
-  status.textContent = "Verificando…";
-  try {
-    if (!crypto.subtle) throw new Error("Abra o jogo por HTTPS ou localhost para entrar.");
-    if (fields.mode.value === "cloud") {
-      if (registering && document.getElementById("confirm-row").hidden) {
-        document.getElementById("confirm-row").hidden = false;
-        fields.confirmation.focus();
-        throw Error("Confirme a senha e clique novamente em Criar conta.");
-      }
-      if (registering && (fields.password.value.length < 8 || fields.password.value !== fields.confirmation.value))
-        throw Error("Use pelo menos 8 caracteres e confirme a mesma senha.");
-      localPlayer = await fmCloud.login(name.trim(), fields.password.value, registering);
-      if (!localPlayer) throw Error("Confira seu e-mail para confirmar o cadastro. Depois use Entrar.");
-      if (fields.legacy.value.trim()) {
-        if (fmCloud.read() !== null) throw Error("Já existe uma partida online. Apague o campo Usuário local para continuar com ela.");
-        const legacy = await authenticate(fields.legacy.value.trim().toLowerCase(), fields.legacyPassword.value, false);
-        const old = localStorage.getItem(legacy.owner ? "fronteira-morta" : "fronteira-morta:save:" + legacy.name);
-        if (!old) throw Error("Nenhuma partida local encontrada neste navegador.");
-        await fmCloud.write(old);
-      }
-    } else {
-      localPlayer = await authenticate(name, fields.password.value, registering);
-    }
-  } catch (error) {
-    status.textContent = error instanceof DOMException || error instanceof SyntaxError ? "O armazenamento local está indisponível." : error.message;
-    delete loginForm.dataset.busy;
-    return;
-  }
-  fields.password.value = fields.confirmation.value = fields.legacyPassword.value = "";
-  document.getElementById("admin-help").hidden = !localPlayer.owner;
-  document.querySelector(".wrap").hidden = false;
+async function startGame() {
+  if (loaded) return;
+  loaded = true;
   loginForm.hidden = true;
-  for (const source of document.getElementById("scripts").content.querySelectorAll("script")) {
-    const script = document.createElement("script");
-    script.src = source.getAttribute("src");
-    try {
+  const stage = document.querySelector(".wrap");
+  stage.hidden = false;
+  // Um erro de JavaScript durante a inicialização não pode deixar só a tela preta.
+  let scriptError = null;
+  const onScriptError = (event) => {
+    if (!scriptError) scriptError = event.error || new Error(event.message || "Falha no jogo");
+  };
+  window.addEventListener("error", onScriptError);
+  try {
+    for (const scriptTag of document.getElementById("game-scripts").content.querySelectorAll("script")) {
+      const script = document.createElement("script");
+      script.src = scriptTag.getAttribute("src");
       await new Promise((resolve, reject) => {
         script.onload = resolve;
-        script.onerror = reject;
-        document.body.append(script);
+        script.onerror = () => reject(new Error("Erro ao carregar " + script.src));
+        document.body.appendChild(script);
       });
-    } catch {
-      document.querySelector(".wrap").hidden = true;
-      loginForm.hidden = false;
-      status.textContent = "Falha ao carregar o jogo. Atualize a página para tentar de novo.";
-      return;
+      if (scriptError) throw scriptError;
+    }
+    passwordEl.value = "";
+    confirmEl.value = "";
+  } catch (error) {
+    stage.hidden = true;
+    loginForm.hidden = false;
+    loginStatus("Erro ao abrir o jogo: " + (error.message || String(error)) +
+      ". Atualize a página com Ctrl+Shift+R. Seu progresso foi preservado.", true);
+    throw error;
+  } finally {
+    window.removeEventListener("error", onScriptError);
+  }
+}
+async function enterAccount(registering) {
+  const email = emailEl.value.trim();
+  const password = passwordEl.value;
+  if (registering && (password.length < 8 || confirmEl.value !== password))
+    throw new Error("Para criar a conta, use pelo menos 8 caracteres e confirme a mesma senha.");
+  const loggedIn = await fmCloud.login(email, password, registering);
+  if (!loggedIn) {
+    confirmRow.hidden = true;
+    confirmEl.value = "";
+    loginStatus("Se este e-mail ainda não tiver uma conta, você receberá uma mensagem de confirmação. Se já estiver cadastrado, use Entrar com sua senha. Não é necessário criar outra conta.");
+    return;
+  }
+  if (importEl.checked && !fmCloud.hasOnlineSave()) {
+    const oldData = localStorage.getItem("fronteira-morta");
+    if (oldData) {
+      JSON.parse(oldData);
+      await fmCloud.write(oldData);
     }
   }
+  loginStatus("Partida carregada. Iniciando...");
+  await startGame();
+}
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (starting || loaded) return;
+  const registering = event.submitter && event.submitter.value === "register";
+  if (registering && confirmRow.hidden) {
+    confirmRow.hidden = false;
+    confirmEl.focus();
+    loginStatus("Confirme a senha e clique novamente em Criar conta.");
+    return;
+  }
+  loginBusy(true);
+  loginStatus(registering ? "Criando conta..." : "Entrando...");
+  try {
+    await enterAccount(registering);
+  } catch (error) {
+    loginStatus(displayAuthError(error), true);
+  } finally {
+    loginBusy(false);
+  }
 });
+function displayAuthError(error) {
+  const detail = String(error && error.message || error || "");
+  if (/failed to fetch|networkerror|load failed/i.test(detail))
+    return "Não foi possível conectar ao Supabase. Atualize a página e use Testar conexão; verifique extensões, VPN ou bloqueios de rede.";
+  return detail || "Não foi possível concluir a solicitação.";
+}
+document.getElementById("test-connection").addEventListener("click", async () => {
+  if (starting) return;
+  loginBusy(true);
+  loginStatus("Testando conexão com o Supabase...");
+  try {
+    const host = await fmCloud.ping();
+    loginStatus("Servidor acessível: " + host + ". Agora tente entrar ou criar a conta.");
+  } catch (error) {
+    loginStatus(displayAuthError(error), true);
+  } finally {
+    loginBusy(false);
+  }
+});
+
+// Recuperação de senha não solicita a senha atual e não expõe se o e-mail existe.
+const forgotForm = document.getElementById("forgot-form");
+const forgotEmail = document.getElementById("forgot-email");
+const forgotStatus = document.getElementById("forgot-status");
+let forgotBusy = false;
+document.getElementById("forgot-password").addEventListener("click", () => {
+  if (starting || loaded) return;
+  forgotEmail.value = emailEl.value.trim();
+  forgotStatus.textContent = "";
+  forgotStatus.classList.remove("error");
+  loginForm.hidden = true;
+  forgotForm.hidden = false;
+  forgotEmail.focus();
+});
+document.getElementById("forgot-back").addEventListener("click", () => {
+  if (forgotBusy) return;
+  emailEl.value = forgotEmail.value.trim();
+  forgotForm.hidden = true;
+  loginForm.hidden = false;
+  loginStatus("Entre com sua conta ou solicite um novo link de recuperação.");
+  emailEl.focus();
+});
+forgotForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (forgotBusy) return;
+  if (!forgotEmail.reportValidity()) return;
+  forgotBusy = true;
+  for (const button of forgotForm.querySelectorAll("button")) button.disabled = true;
+  forgotStatus.textContent = "Solicitando link de recuperação...";
+  forgotStatus.classList.remove("error");
+  try {
+    await fmCloud.sendPasswordRecovery(forgotEmail.value);
+    forgotStatus.textContent = "Se este e-mail estiver cadastrado, enviaremos um link de recuperação. Abra o link no e-mail para confirmar que a conta é sua e definir uma nova senha. Confira também o spam.";
+  } catch (error) {
+    forgotStatus.classList.add("error");
+    forgotStatus.textContent = displayAuthError(error);
+  } finally {
+    forgotBusy = false;
+    for (const button of forgotForm.querySelectorAll("button")) button.disabled = false;
+  }
+});
+
+document.getElementById("resend-confirmation").addEventListener("click", async () => {
+  if (starting) return;
+  if (!emailEl.reportValidity()) return;
+  loginBusy(true);
+  loginStatus("Reenviando confirmação...");
+  try {
+    await fmCloud.resend(emailEl.value);
+    loginStatus("Se a confirmação estiver pendente, confira o e-mail de confirmação mais recente.");
+  } catch (error) {
+    loginStatus(displayAuthError(error), true);
+  } finally {
+    loginBusy(false);
+  }
+});
+
+(async () => {
+  try {
+    if (localStorage.getItem("fronteira-morta")) importRow.hidden = false;
+  } catch (_) { /* navegação privada sem acesso ao armazenamento */ }
+  const urlError = new URLSearchParams(location.hash.replace(/^#/, ""));
+  if (urlError.get("error")) {
+    const expired = urlError.get("error_code") === "otp_expired";
+    loginStatus(expired ? "O link de confirmação expirou. Informe seu e-mail e clique em Reenviar confirmação."
+      : (urlError.get("error_description") || "Não foi possível confirmar o e-mail."), true);
+    history.replaceState(null, "", location.pathname + location.search);
+    return;
+  }
+  loginStatus("Verificando sessão...");
+  try {
+    if (await fmCloud.resume()) {
+      loginStatus("Sessão restaurada. Carregando seu jogo...");
+      await startGame();
+    } else {
+      loginStatus("Entre ou crie sua conta para continuar o jogo.");
+    }
+  } catch (error) {
+    loginStatus(displayAuthError(error), true);
+  }
+})();

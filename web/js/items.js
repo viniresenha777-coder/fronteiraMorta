@@ -33,7 +33,7 @@ const CAT_LABEL = { pistols: "Pistola", machinegun: "Metralhadora", shotguns: "E
 // look = formato do desenho · req = [força, proficiência] · slow = % de velocidade perdida com a arma na mão
 const WLIST = [
   // pistolas
-  { id: "pistola",  name: "Pistola 9mm",   cat: "pistols", look: "pistol",   dmg: 20, delay: 300, mag: 12, reload: 1000, ammo: "9mm",  price: 0,    req: [0, 10],  len: 14, color: "#3b3a30", sound: [0.1, 0.15] },
+  { id: "pistola",  name: "Pistola 9mm",   cat: "pistols", look: "pistol",   dmg: 20, delay: 300, mag: 12, reload: 1000, ammo: "9mm",  price: 0,    req: [0, 5],  len: 14, color: "#3b3a30", sound: [0.1, 0.15] },
   { id: "colt",     name: "Colt .45",      cat: "pistols", look: "pistol",   dmg: 32, delay: 330, mag: 8,  reload: 1100, ammo: ".45",  price: 300,  req: [10, 20], len: 15, color: "#6a6a66" },
   { id: "glock",    name: "Glock 18",      cat: "pistols", look: "pistol",   dmg: 15, delay: 110, mag: 20, reload: 1100, ammo: "9mm",  price: 350,  req: [10, 25], len: 15, color: "#2a2a2a", short: "Glock 18" },
   { id: "revolver", name: "Revólver Magnum", short: "Magnum", cat: "pistols", look: "revolver", dmg: 58, delay: 560, mag: 6, reload: 1900, ammo: ".50", price: 650, req: [15, 35], len: 17, color: "#8a8f96" },
@@ -50,7 +50,7 @@ const WLIST = [
   { id: "scar",     name: "SCAR-H",        cat: "machinegun", look: "ar",    dmg: 64, delay: 140, mag: 20, reload: 1900, ammo: "7.62", price: 3000, req: [40, 100], len: 31, color: "#8a7a5a" },
   // metralhadoras pesadas
   { id: "m249",     name: "M249",          cat: "machinegun", look: "lmg",   dmg: 38, delay: 90,  mag: 100, reload: 4000, ammo: "5.56", price: 4200, req: [55, 110], len: 34, color: "#2a2d30", slow: 6 },
-  { id: "minigun",  name: "Minigun",       cat: "machinegun", look: "minigun", dmg: 30, delay: 45, mag: 250, reload: 6000, ammo: "5.56", price: 9000, req: [80, 150], len: 34, color: "#4a4d50", slow: 14 },
+  { id: "minigun",  name: "Minigun",       cat: "machinegun", look: "minigun", dmg: 30, delay: 45, mag: 250, reload: 6000, ammo: "5.56", price: 9000, req: [80, 120], len: 34, color: "#4a4d50", slow: 14 },
   // escopetas
   { id: "canoduplo", name: "Cano Duplo",   cat: "shotguns", look: "shotgun", dmg: 26, delay: 350, mag: 2,  reload: 1500, ammo: "cartucho", price: 450,  req: [15, 30], len: 26, color: "#6b4a2b", wood: true, pellets: 6, spread: 0.32, life: 360 },
   { id: "escopeta", name: "Escopeta",      cat: "shotguns", look: "shotgun", dmg: 22, delay: 800, mag: 6,  reload: 2200, ammo: "cartucho", price: 700,  req: [20, 40], len: 28, color: "#6b4a2b", wood: true, pellets: 5, spread: 0.28, life: 380 },
@@ -58,10 +58,10 @@ const WLIST = [
   { id: "aa12",     name: "AA-12",         cat: "shotguns", look: "shotgun", dmg: 20, delay: 220, mag: 20, reload: 3000, ammo: "cartucho", price: 4500, req: [50, 110], len: 28, color: "#3a3d40", pellets: 5, spread: 0.3, life: 380, drum: true },
   // rifles
   { id: "caca",     name: "Rifle de Caça", cat: "rifles", look: "rifle",   dmg: 90,  delay: 900,  mag: 5,  reload: 2200, ammo: "7.62", price: 900,  req: [15, 35],  len: 34, color: "#6b4a2b", pierce: true, speed: 17, life: 1200 },
-  { id: "sniper",   name: "Sniper",        cat: "rifles", look: "rifle",   dmg: 120, delay: 1100, mag: 5,  reload: 2400, ammo: "7.62", price: 1500, req: [25, 70],  len: 36, color: "#2f3b2a", pierce: true, speed: 18, life: 1300, sound: [0.1, 0.15] },
-  { id: "barrett",  name: "Barrett .50",   cat: "rifles", look: "rifle",   dmg: 260, delay: 1400, mag: 10, reload: 3200, ammo: ".50",  price: 6500, req: [60, 130], len: 40, color: "#3a3d32", pierce: true, speed: 20, life: 1500, sound: [1, 1] },
+  { id: "sniper",   name: "Rifle Básico",        cat: "rifles", look: "rifle",   dmg: 120, delay: 1100, mag: 5,  reload: 2400, ammo: "7.62", price: 1500, req: [25, 70],  len: 36, color: "#2f3b2a", pierce: true, speed: 18, life: 1300, sound: [0.1, 0.15] },
+  { id: "barrett",  name: "Barrett .50",   cat: "rifles", look: "rifle",   dmg: 260, delay: 1400, mag: 10, reload: 3200, ammo: ".50",  price: 6500, req: [60, 120], len: 40, color: "#3a3d32", pierce: true, speed: 20, life: 1500, sound: [1, 1] },
   // corpo a corpo
-  { id: "faca",     name: "Faca",          cat: "melee", look: "knife",   dmg: 18,  delay: 250,  range: 42, arc: 0.7,  price: 100,  req: [0, 10],  len: 16, color: "#c9ced2" },
+  { id: "faca",     name: "Faca",          cat: "melee", look: "knife",   dmg: 18,  delay: 250,  range: 42, arc: 0.7,  price: 100,  req: [0, 5],  len: 16, color: "#c9ced2" },
   { id: "taco",     name: "Taco de beisebol", short: "Taco", cat: "melee", look: "bat", dmg: 30, delay: 480, range: 56, arc: 0.9, price: 150, req: [10, 15], len: 28, color: "#8a6a45" },
   { id: "facao",    name: "Facão",         cat: "melee", look: "machete", dmg: 42,  delay: 420,  range: 58, arc: 0.85, price: 400,  req: [15, 30], len: 28, color: "#b9bec2" },
   { id: "katana",   name: "Katana",        cat: "melee", look: "katana",  dmg: 35,  delay: 450,  range: 62, arc: 0.95, price: 600,  req: [10, 20], len: 34, color: "#d7dde0" },
@@ -70,13 +70,13 @@ const WLIST = [
   { id: "espada",   name: "Espada longa",  short: "Espada", cat: "melee", look: "sword", dmg: 70, delay: 600, range: 78, arc: 1.0, price: 1800, req: [40, 90], len: 40, color: "#d0d4d8" },
   // lendárias (só em saques de VIP)
   { id: "ak_ouro",  name: "AK-47 Dourada", short: "AK Ouro", cat: "machinegun", look: "ar", dmg: 70, delay: 120, mag: 40, reload: 1600, ammo: "7.62", price: 0, req: [60, 120], len: 32, color: "#d4af37", legendary: true },
-  { id: "katana_dragao", name: "Katana do Dragão", short: "Katana Dr.", cat: "melee", look: "katana", dmg: 90, delay: 380, range: 72, arc: 1.1, price: 0, req: [70, 130], len: 38, color: "#e05a3a", legendary: true },
+  { id: "katana_dragao", name: "Katana do Dragão", short: "Katana Dr.", cat: "melee", look: "katana", dmg: 90, delay: 380, range: 72, arc: 1.1, price: 0, req: [70, 120], len: 38, color: "#e05a3a", legendary: true },
   // especiais (só criando na oficina)
   { id: "besta",    name: "Besta silenciosa", short: "Besta", cat: "rifles", look: "crossbow", dmg: 160, delay: 850, mag: 1, reload: 900, ammo: "virote", price: 0, req: [20, 50], len: 30, color: "#5a4a32", pierce: true, speed: 15, life: 1300, sound: [0, 0], special: true },
   { id: "serra",    name: "Serra elétrica", short: "Serra", cat: "melee", look: "chainsaw", dmg: 22, delay: 90, range: 52, arc: 0.55, price: 0, req: [30, 60], len: 34, color: "#d08a2a", sound: [0.6, 0.8], special: true },
   { id: "lancachamas", name: "Lança-chamas", short: "Lança-ch.", cat: "machinegun", look: "flamer", dmg: 9, delay: 60, mag: 120, reload: 2600, ammo: "combustível", price: 0, req: [35, 70], len: 30, color: "#a33b32", pellets: 3, spread: 0.22, life: 300, speed: 7, pierce: true, fire: true, sound: [0.5, 0.6], special: true },
   { id: "lamina",   name: "Lâmina Sombria", short: "Lâmina S.", cat: "melee", look: "katana", dmg: 110, delay: 420, range: 74, arc: 1.05, price: 0, req: [60, 120], len: 40, color: "#8a5ae0", lifesteal: 0.08, special: true },
-  { id: "trovao",   name: "Rifle Trovão",  short: "Trovão", cat: "rifles", look: "rifle", dmg: 300, delay: 1300, mag: 4, reload: 2800, ammo: ".50", price: 0, req: [70, 140], len: 40, color: "#3a5a8a", pierce: true, explode: 90, speed: 18, life: 1400, sound: [1, 1], special: true },
+  { id: "trovao",   name: "Rifle Trovão",  short: "Trovão", cat: "rifles", look: "rifle", dmg: 300, delay: 1300, mag: 4, reload: 2800, ammo: ".50", price: 0, req: [70, 120], len: 40, color: "#3a5a8a", pierce: true, explode: 90, speed: 18, life: 1400, sound: [1, 1], special: true },
   // novas armas com efeitos (bleed = chance de sangramento · burn = dano de fogo por segundo · stun = chance de atordoar · crit = +% de crítico)
   { id: "silenciada", name: "Pistola silenciada", short: "Silenciada", cat: "pistols", look: "pistol", dmg: 24, delay: 280, mag: 15, reload: 1100, ammo: "9mm", price: 550, req: [10, 30], len: 18, color: "#2a2a2a", sound: [0.02, 0.05] },
   { id: "revolver_orn", name: "Revólver Ornamentado", short: "Ornamentado", cat: "pistols", look: "revolver", dmg: 110, delay: 520, mag: 6, reload: 1700, ammo: ".50", price: 0, req: [30, 90], len: 18, color: "#b07a3a", crit: 25 },
@@ -84,10 +84,10 @@ const WLIST = [
   { id: "choque",   name: "Rifle de Choque", short: "Choque", cat: "rifles", look: "rifle", dmg: 140, delay: 900, mag: 8, reload: 2200, ammo: "7.62", price: 0, req: [45, 110], len: 36, color: "#3a8ac0", pierce: true, speed: 19, life: 1300, stun: 0.6 },
   { id: "baioneta", name: "Fuzil Baioneta", short: "Baioneta", cat: "machinegun", look: "ar", dmg: 58, delay: 130, mag: 30, reload: 1700, ammo: "5.56", price: 0, req: [40, 100], len: 34, color: "#5a5d60", bleed: 0.3 },
   { id: "lancador", name: "Lançador Espinhoso", short: "Lançador", cat: "rifles", look: "rifle", dmg: 220, delay: 1100, mag: 6, reload: 3000, ammo: "granada", price: 0, req: [45, 110], len: 30, color: "#4a4a4a", explode: 120, speed: 8, life: 1100, sound: [1, 1], grenade: true },
-  { id: "machado_fuzil", name: "Fuzil-Machado", short: "Fuzil-Mach.", cat: "machinegun", look: "lmg", dmg: 85, delay: 140, mag: 40, reload: 2600, ammo: "7.62", price: 0, req: [60, 130], len: 38, color: "#6a6d70", pierce: true, knock: true, slow: 8 },
+  { id: "machado_fuzil", name: "Fuzil-Machado", short: "Fuzil-Mach.", cat: "machinegun", look: "lmg", dmg: 85, delay: 140, mag: 40, reload: 2600, ammo: "7.62", price: 0, req: [60, 120], len: 38, color: "#6a6d70", pierce: true, knock: true, slow: 8 },
   { id: "pistolalamina", name: "Pistola-Lâmina", short: "P.-Lâmina", cat: "shotguns", look: "shotgun", dmg: 60, delay: 420, mag: 6, reload: 1800, ammo: "cartucho", price: 0, req: [50, 120], len: 32, color: "#b08a4a", pellets: 4, spread: 0.18, life: 420, bleed: 0.5, lifesteal: 0.05 },
-  { id: "espadaserra", name: "Espada-Serra", short: "Esp.-Serra", cat: "melee", look: "chainsaw", dmg: 60, delay: 160, range: 70, arc: 0.8, price: 0, req: [60, 130], len: 40, color: "#a33b32", bleed: 0.6, sound: [0.6, 0.8] },
-  { id: "espadafogo", name: "Espada Flamejante", short: "Esp. Fogo", cat: "melee", look: "sword", dmg: 150, delay: 520, range: 82, arc: 1.05, price: 0, req: [70, 140], len: 42, color: "#ff8a3a", burn: 40 },
+  { id: "espadaserra", name: "Espada-Serra", short: "Esp.-Serra", cat: "melee", look: "chainsaw", dmg: 60, delay: 160, range: 70, arc: 0.8, price: 0, req: [60, 120], len: 40, color: "#a33b32", bleed: 0.6, sound: [0.6, 0.8] },
+  { id: "espadafogo", name: "Espada Flamejante", short: "Esp. Fogo", cat: "melee", look: "sword", dmg: 150, delay: 520, range: 82, arc: 1.05, price: 0, req: [70, 120], len: 42, color: "#ff8a3a", burn: 40 },
   // munição infinita, mas superaquece: segure o tiro com cuidado
   { id: "minigun_inf", name: "Minigun Infernal", short: "Infernal", cat: "machinegun", look: "minigun", dmg: 26, delay: 50, mag: 600, reload: 3250, ammo: "", price: 0, req: [100, 120], minLevel: 25, len: 36, color: "#8a6a4a", slow: 20, infinite: true, noCrit: true, spread: 0.2, sound: [1, 1] },
   // sem arma na mão
@@ -137,12 +137,23 @@ const OLD_IDS = ["pistola", "ak47", "deagle", "katana", "uzi", "escopeta", "snip
 
 // ---------- Materiais e receitas ----------
 const MATS = {
+  reset_stats: { name: "Cartão Reset de Stats", price: 5000 },
+  trindade_eterna: { name: "Trindade · 100 anos", price: 20000000 },
   sucata:      { name: "Sucata de metal",          price: 40 },
   pecas:       { name: "Peças de arma",            price: 90 },
   eletronicos: { name: "Componentes eletrônicos",  price: 140 },
   nucleo:      { name: "Núcleo raro",              price: 0 },
-  placa:       { name: "Placa de blindagem",       price: 0 }
+  placa:       { name: "Placa de blindagem",       price: 0 },
+  cofre10k:    { name: "Cofre 10.000", price: 1000, cashProtection: 10000 },
+  cofre100k:   { name: "Cofre 100.000", price: 10000, cashProtection: 100000 },
+  cofre500k:   { name: "Cofre 500.000", price: 50000, cashProtection: 500000 }
 };
+const SAFE_IDS = ["cofre10k", "cofre100k", "cofre500k"];
+function cashProtection(pack = player.pack) {
+  return pack.reduce((limit, it) => Math.max(limit,
+    it && it.kind === "mat" && it.qty > 0 ? (MATS[it.id] && MATS[it.id].cashProtection) || 0 : 0), 0);
+}
+function safeDescription(id) { return `Protege até $${MATS[id].cashProtection.toLocaleString("pt-BR")} ao morrer.`; }
 const RECIPES = [
   { id: "besta",       mats: { sucata: 4, pecas: 4 },                     money: 1200, level: 8 },
   { id: "serra",       mats: { sucata: 6, pecas: 3, eletronicos: 3 },     money: 1500, level: 10 },
@@ -168,11 +179,31 @@ function upEffect(d, stat, lv) {
   if (stat === "acc") return d.melee ? `+${lv * 4}% de alcance` : `-${lv * 9}% de dispersão`;
   return d.melee ? `-${lv * 4}% de tempo entre golpes` : `-${lv * 6}% no tempo de recarga`;
 }
-function upgradeCost(inst, stat) {
-  const d = WDEF[inst.id], L = inst.up[stat];
-  const base = 120 + (d.special || d.legendary ? 3000 : d.price) * 0.12;
-  return { money: Math.round(base * (L + 1)), mats: { sucata: L + 1, pecas: Math.max(0, L - 2), eletronicos: L >= 6 ? L - 5 : 0 } };
+// Each roll replaces every stat, including when the old roll was stronger.
+function rollUpgrades(stats, max, random = Math.random) {
+  return Object.fromEntries(stats.map(s => [s.id, 1 + Math.floor(random() * max)]));
 }
+function upgradeCost(inst) {
+  const d = WDEF[inst.id];
+  return { money: Math.round(240 + (d.special || d.legendary ? 3000 : d.price) * 0.24), mats: { sucata: 2 } };
+}
+const VEST_UP_MAX = 24;
+const VEST_UP_STATS = [{ id: "armor", name: "Armadura" }, { id: "speed", name: "Velocidade" }];
+function cleanVestUpgrade(up) {
+  const out = {};
+  for (const s of VEST_UP_STATS) {
+    const n = Number(up && up[s.id]);
+    out[s.id] = Number.isFinite(n) ? clamp(Math.floor(n), 0, VEST_UP_MAX) : 0;
+  }
+  return out;
+}
+function vestUpgrade(i = save.vest) {
+  return cleanVestUpgrade(i >= 0 && save.vestUpgrades ? save.vestUpgrades[i] : null);
+}
+function vestUpgradeCost(i) {
+  return { money: Math.round(240 + VESTS[i].price * 0.24), mats: { sucata: 2 } };
+}
+function vestSpeedBonus() { return vestUpgrade().speed; }
 
 // ---------- Instâncias de armas ----------
 const SLOT_N = 3, PACK_MAX = 20, VAULT_MAX = 40;
@@ -182,7 +213,8 @@ function wStat(inst) {
   return {
     dmg: d.dmg * (1 + 0.06 * u.dmg),
     spread: (d.spread || 0.03) * (1 - 0.09 * u.acc),
-    reload: (d.reload || 0) * (1 - 0.06 * u.rel),
+    // Rifles: recarga 15% mais lenta, mantendo upgrades e atributos ativos.
+    reload: (d.reload || 0) * (1 - 0.06 * u.rel) * (d.cat === "rifles" ? 1.15 : 1),
     delay: d.melee ? d.delay * (1 - 0.04 * u.rel) : d.delay,
     range: d.melee ? d.range * (1 + 0.04 * u.acc) : 0
   };
@@ -190,7 +222,7 @@ function wStat(inst) {
 function curInst() { return player.slots[player.cur]; }
 function curW() { const i = curInst(); return WDEF[i ? i.id : "punhos"]; }
 function upSum(inst) { return inst.up.acc + inst.up.dmg + inst.up.rel; }
-function instName(inst) { const s = upSum(inst); return WDEF[inst.id].name + (s ? ` +${s}` : ""); }
+function instName(inst) { const s = upSum(inst); return WDEF[inst.id].name + (inst.gc && inst.up.acc === 8 && inst.up.dmg === 8 && inst.up.rel === 8 ? " (GC)" : (s ? ` +${s}` : "")); }
 function canUse(d) { if (adm.noReq || d.fists) return true; return A("str") >= d.req[0] && A(d.cat) >= d.req[1] && (!d.minLevel || player.level >= d.minLevel); }
 function reqText(d) { return `${d.minLevel ? `Nível ${d.minLevel}+ · ` : ""}Força ${d.req[0]} · ${CATNAME[d.cat]} ${d.req[1]}`; }
 function dmgMult(d) {
@@ -258,6 +290,15 @@ const MED_SPR = ["medkit", "pills", "bandage", "syringes"];
 function R_(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
 function RR_(x, y, w, h, ang, c) { ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.fillStyle = c; ctx.fillRect(0, 0, w, h); ctx.restore(); }
 function drawWeaponSide(d, cx, cy, s) {
+  const ic = weaponIcon(d);                     // arma com modelo 3D: usa a foto do próprio modelo
+  if (ic) {
+    const f = WEAPON_3D[d.id].f;
+    if (f) ctx.filter = f;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(ic, cx - 64 * s, cy - 32 * s, 128 * s, 64 * s);
+    ctx.filter = "none";
+    return;
+  }
   if (d.spr && SPR[d.spr]) {
     if (d.tint) ctx.filter = d.tint;
     drawSpr(d.spr, cx, cy, 128 * s, 62 * s);
@@ -336,9 +377,39 @@ function drawWeaponSide(d, cx, cy, s) {
   }
   ctx.restore();
 }
+// Ícone oficial da Trindade (três seringas), carregado uma única vez.
+const RESET_CARD_ART = new Image();
+RESET_CARD_ART.src = "img/fm_reset_card.webp?v=20261116-reset-final";
+const TRINDADE_ICON = new Image();
+TRINDADE_ICON.src = "img/trindade_icon.webp?v=20261116-highres1";
 function drawMatIcon(id, cx, cy, s) {
   ctx.save(); ctx.translate(cx, cy); ctx.scale(s, s);
-  if (id === "sucata") {
+  if (id === "reset_stats" && RESET_CARD_ART.complete && RESET_CARD_ART.naturalWidth) {
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(RESET_CARD_ART, -31, -23, 62, 46);
+  } else if (id === "trindade_eterna") {
+    if (TRINDADE_ICON.complete && TRINDADE_ICON.naturalWidth > 0) {
+      // Mantém a proporção e a transparência nas células da mochila e na loja.
+      ctx.drawImage(TRINDADE_ICON, -30, -30, 60, 60);
+    } else {
+      // Ícone reserva somente enquanto a imagem original está carregando.
+      ctx.fillStyle = "#20212b"; rr(-28, -23, 56, 46, 5); ctx.fill();
+      ctx.strokeStyle = "#ebce79"; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = "#ebce79";
+      for (let j = 0; j < 3; j++) {
+        const a = -Math.PI / 2 + j * Math.PI * 2 / 3;
+        circle(Math.cos(a) * 13, Math.sin(a) * 13, 6);
+      }
+      txt("III", 0, 17, 13, "#fff1bd", "center", true);
+    }
+  } else if (MATS[id] && MATS[id].cashProtection) {
+    ctx.fillStyle = "#59646b"; rr(-28, -24, 56, 48, 5); ctx.fill();
+    ctx.fillStyle = "#2d373d"; rr(-21, -18, 42, 36, 3); ctx.fill();
+    ctx.strokeStyle = "#b7c3ca"; ctx.lineWidth = 3; ctx.strokeRect(-21, -18, 42, 36);
+    ctx.fillStyle = id === "cofre500k" ? "#e0c341" : id === "cofre100k" ? "#73ceff" : "#b7c3ca";
+    circle(2, 0, 9); ctx.fillStyle = "#2d373d"; circle(2, 0, 3);
+    ctx.fillStyle = "#b7c3ca"; ctx.fillRect(-19, -10, 4, 20);
+  } else if (id === "sucata") {
     poly([[-30, 10], [-10, -14], [4, 2], [-8, 16]], "#7a7d80"); poly([[0, -10], [26, -16], [30, 4], [8, 8]], "#5a5d60"); poly([[-6, 6], [20, 4], [24, 20], [-2, 22]], "#8a6a4a");
   } else if (id === "pecas") {
     ctx.fillStyle = "#8a8f96"; circle(-10, 0, 16); ctx.fillStyle = "#3a3c3e"; circle(-10, 0, 6);
@@ -360,8 +431,16 @@ function drawMatIcon(id, cx, cy, s) {
   }
   ctx.restore();
 }
-// colete visto de frente (desenhado em código)
+// arte de cada colete (img/vests/vest<i>.png, foto do modelo 3D sem o corpo). Sem o arquivo, usa o desenho em código.
+const VEST_ART = [];
+function vestArt(i) {
+  let im = VEST_ART[i];
+  if (!im) { im = VEST_ART[i] = new Image(); im.onerror = () => { im.bad = true; }; im.src = `img/vests/vest${i}.png`; }
+  return im.bad || !im.complete || !im.naturalWidth ? null : im;
+}
 function drawVestIcon(i, cx, cy, s) {
+  const art = vestArt(i);
+  if (art) { const d = 84 * s; ctx.imageSmoothingQuality = "high"; ctx.drawImage(art, cx - d / 2, cy - d / 2, d, d); return; }
   const v = VESTS[i], c = v.color, dk = shade(c, -0.4), lt = shade(c, 0.25);
   ctx.save(); ctx.translate(cx, cy); ctx.scale(s, s);
   poly([[-22, -26], [-10, -26], [-6, -18], [6, -18], [10, -26], [22, -26], [26, -14], [24, 26], [-24, 26], [-26, -14]], c);
@@ -383,9 +462,24 @@ function drawCreditIcon(cx, cy, s) {
   txt("C", 0, 8, 22, "#7a5a1a", "center", true);
   ctx.restore();
 }
+// Arte oficial dos 29 implantes, atlas 6 colunas × 5 linhas (160 px por célula).
+const NEW_IMPLANTS_ATLAS = new Image();
+NEW_IMPLANTS_ATLAS.src = "img/implantes_29_atlas.webp?v=20261116-atlas6x5";
 // ícone de qualquer coisa encontrada ou guardada
 function drawEntryIcon(e, cx, cy, s) {
   const t = e.type || e.kind;
+  if (t === "implant" && e.im && IMP[e.im.id] && NEW_IMPLANTS_ATLAS.complete && NEW_IMPLANTS_ATLAS.naturalWidth) {
+    const idx = IMP_IDS.indexOf(e.im.id);
+    if (idx >= 0) {
+      const tile = 160, col = idx % 6, row = Math.floor(idx / 6), size = 64 * s;
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(NEW_IMPLANTS_ATLAS, col * tile, row * tile, tile, tile, cx - size / 2, cy - size / 2, size, size);
+      ctx.restore();
+      return;
+    }
+  }
   if (t === "vest") { drawVestIcon(e.idx, cx, cy, s); return; }
   if (t === "credit") { drawCreditIcon(cx, cy, s); return; }
   if (e.spr && drawSpr(e.spr, cx, cy, 70 * s, 56 * s)) return;
@@ -418,7 +512,7 @@ function drawEntryIcon(e, cx, cy, s) {
   } else if (t === "implant") {
     ctx.fillStyle = "#2a2d30"; rr(-20, -20, 40, 40, 4); ctx.fill();
     ctx.fillStyle = "#9aa0a6"; for (let i = 0; i < 4; i++) { ctx.fillRect(-16 + i * 10, -26, 3, 6); ctx.fillRect(-16 + i * 10, 20, 3, 6); }
-    ctx.fillStyle = e.im ? (IMP[e.im.id].combo ? "#c58bff" : TIER_COLOR[e.im.tier - 1]) : "#4aa3df"; rr(-10, -10, 20, 20, 3); ctx.fill();
+    ctx.fillStyle = e.im ? impColor(e.im) : "#4aa3df"; rr(-10, -10, 20, 20, 3); ctx.fill();
   }
   ctx.restore();
 }

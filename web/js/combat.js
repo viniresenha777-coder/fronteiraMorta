@@ -6,22 +6,60 @@
 function Zs() { return game.inside ? game.inside.zombies : zombies; }
 function curCorpses() { return game.inside ? game.inside.corpses : world.corpses; }
 function nearObs(x, y, r) { return game.inside ? game.inside.interior : world.obs.query(x - r, y - r, x + r, y + r); }
+// Física restrita ao centro da base do poste; nunca ao desenho projetado.
+function lampRadius(l) { return l.big ? 3.5 : 2.5; }
 function pushOut(e, r) {
   for (const o of nearObs(e.x, e.y, r + 2)) {
     const cx = Math.max(o.x, Math.min(e.x, o.x + o.w)), cy = Math.max(o.y, Math.min(e.y, o.y + o.h));
     const dx = e.x - cx, dy = e.y - cy, d = Math.hypot(dx, dy);
     if (d < r) {
-      if (d > 0) { e.x += (dx / d) * (r - d); e.y += (dy / d) * (r - d); }
-      else e.y -= r;
+      if (d > 0) {
+        // Contato circular nas bordas do retângulo, com deslizamento.
+        e.x += dx / d * (r - d); e.y += dy / d * (r - d);
+      } else {
+        // Centro do personagem DENTRO de um carro/parede: o código
+        // antigo movia só r pixels, deixando o jogador preso ou
+        // aparentemente atravessando a carroceria durante vários frames.
+        // Agora sai diretamente pela borda mais próxima.
+        const sides = [
+          [e.x - o.x, 0],
+          [o.x + o.w - e.x, 1],
+          [e.y - o.y, 2],
+          [o.y + o.h - e.y, 3]
+        ];
+        sides.sort((a, b) => a[0] - b[0]);
+        const side = sides[0][1];
+        if (side === 0) e.x = o.x - r - 0.01;
+        else if (side === 1) e.x = o.x + o.w + r + 0.01;
+        else if (side === 2) e.y = o.y - r - 0.01;
+        else e.y = o.y + o.h + r + 0.01;
+      }
+    }
+  }
+  if (!game.inside && world && world.lamps) for (const l of world.lamps) {
+    const dx = e.x - l.x, dy = e.y - l.y, dist = Math.hypot(dx, dy);
+    const minD = r + lampRadius(l);
+    if (dist < minD) {
+      if (dist > 0) { e.x += dx / dist * (minD - dist); e.y += dy / dist * (minD - dist); }
+      else e.y += minD;
     }
   }
 }
 function blocked(x, y) { return !!hitObstacle(x, y); }
+// Tiros e cuspe passam por cima do que é mais baixo que o personagem (caçamba, caixote, barril, corpo,
+// chafariz, cerca e postes decorativos). Param em casa, carro, árvore e objetos altos (contêiner, ruína, torre...).
+const LOW_SOLIDS = new Set(["dumpster", "crate", "fountain", "body"]);
+function stopsShots(o) { return !o.thin && !o.low && !LOW_SOLIDS.has(o.kind); }
 // devolve o obstáculo atingido (ou true para paredes/borda), ou null
 function hitObstacle(x, y) {
   if (game.inside) return x < 40 || x > IW() - 40 || y < 40 || y > IH() - 40 || game.inside.interior.some((o) => inRect(x, y, o)) || null;
   if (x < 0 || y < 0 || x > WORLD_W || y > WORLD_H) return true;
-  return world.obs.at(x, y).find((o) => !o.thin && inRect(x, y, o)) || null;
+  const o = world.obs.at(x, y).find((o) => stopsShots(o) && inRect(x, y, o));
+  if (o) return o;
+  // Somente o miolo da base do poste bloqueia tiros.
+  // Projeção e sombra não têm colisão.
+  for (const l of world.lamps) if (Math.hypot(x - l.x, y - l.y) <= lampRadius(l)) return l;
+  return null;
 }
 
 // ---------- Carros explosivos ----------
@@ -106,17 +144,47 @@ function cycleWeapon(dir) {
     if (player.slots[i]) { player.cur = i; player.reloading = 0; return; }
   }
 }
+// Rifles recebem +15% no wStat(). Rifle de Caça usa o tempo total
+// dividido pelos 5 cartuchos, para uma recarga progressiva e interruptível.
 function startReload() {
   const w = curW(), it = curInst();
   if (game.over || w.melee || !it || player.reloading > 0 || it.ammo >= w.mag) return;
   if (!w.infinite && player.reserve[w.ammo] <= 0) { toast("Sem munição de reserva"); sfx.empty(); return; }
-  player.reloading = player.reloadMax = wStat(it).reload * (1 - Math.max(-0.5, Math.min(0.6, player.fx.reload / 100))) / (1 + (A("reload") - 10) * 0.012);
-  sfx.reload();
+  const reloadTime = wStat(it).reload *
+    (1 - Math.max(-0.5, Math.min(0.6, player.fx.reload / 100))) /
+    (1 + (A("reload") - 10) * 0.012);
+  player.reloadRound = w.id === "caca";
+  player.reloadWeapon = it;
+  player.reloadMax = player.reloading = player.reloadRound ? reloadTime / w.mag : reloadTime;
+  if (player.reloadRound) sfx.reloadRound();
+  else sfx.reload();
 }
 function finishReload() {
   const w = curW(), it = curInst();
+  // Trocou de arma durante a recarga: não transfere cartuchos para outra arma.
+  if (!it || it !== player.reloadWeapon || w.melee) {
+    player.reloading = 0;
+    player.reloadRound = false;
+    player.reloadWeapon = null;
+    return;
+  }
+  if (player.reloadRound) {
+    if (it.ammo < w.mag && player.reserve[w.ammo] > 0) {
+      it.ammo += 1;
+      player.reserve[w.ammo] -= 1;
+    }
+    if (it.ammo < w.mag && player.reserve[w.ammo] > 0) {
+      player.reloading = player.reloadMax;
+      sfx.reloadRound();
+    } else {
+      player.reloading = 0;
+      player.reloadRound = false;
+      player.reloadWeapon = null;
+    }
+    return;
+  }
   player.reloading = 0;
-  if (!it || w.melee) return;
+  player.reloadWeapon = null;
   if (w.infinite) { it.ammo = w.mag; return; }
   const take = Math.min(w.mag - it.ammo, player.reserve[w.ammo]);
   it.ammo += take; player.reserve[w.ammo] -= take;
@@ -129,10 +197,12 @@ function explode(x, y, r, dmg) {
   embers(x, y, 14); scorch(x, y, r * 0.55);
   game.shake = Math.min(14, game.shake + 6);
   makeNoise(x, y, NOISE_R, 1);
-  sfx.shot({ cat: "shotguns" });
+  // Explosão espacial do pacote Military_Free; fallback ao som original.
+  if (!fmPlaySample("explosion", {x,y,volume:.90})) sfx.shot({cat:"shotguns"});
 }
 function hurt(z, dmg, ang, quiet, fx) {
-  let d = dmg * (1 + player.fx.firepower / 100) * adm.dmg, crit = false;
+  z.lastMelee = !!(fx && fx.melee);   // o Rastejante só não explode quando morre no corpo a corpo
+  let d = dmg * (1 + player.fx.firepower / 100) * adm.dmg * (trindadeActive() ? 1.35 : 1), crit = false;
   if (player.fx.rage && player.hp / player.maxHp < 0.4) d *= 1 + player.fx.rage / 100;
   if (!(fx && fx.noCrit) && Math.random() * 100 < Math.min(85, A("crit") * 0.5 + player.fx.crit + (fx && fx.crit ? fx.crit : 0))) { d *= 2 + player.fx.critDmg / 100; crit = true; }
   // o Capataz bloqueia de frente: atire pelas costas ou pelos lados
@@ -141,6 +211,17 @@ function hurt(z, dmg, ang, quiet, fx) {
     if (!quiet && Math.random() < 0.3) game.floats.push({ x: z.x, y: z.y - z.r - 10, text: "BLOQUEADO", t: 600 });
   }
   if (z.bossId === "ceifador" && z.phase > 0) d *= 0.2; // sumindo: quase imune
+  // Em um setor compartilhado, só o líder altera a vida dos zumbis.
+  // Os tiros de outros jogadores são encaminhados ao líder via Broadcast.
+  if (typeof fmWorld !== "undefined" && fmWorld.isFollower()) {
+    fmWorld.reportHit(z, d, ang);
+    z.flash = 90;
+    if (!quiet) {
+      game.floats.push({ x: z.x, y: z.y - z.r, text: Math.round(d).toString(), t: 700 });
+      sfx.hit();
+    }
+    return d;
+  }
   z.hp -= d; z.flash = 90;
   if (player.fx.leech) player.hp = Math.min(player.maxHp, player.hp + Math.min(player.maxHp * 0.05, d * player.fx.leech / 100));
   if (fx && z.hp > 0) {
@@ -158,7 +239,7 @@ function hurt(z, dmg, ang, quiet, fx) {
 }
 function attack() {
   const w = curW(), it = curInst(), st = wStat(it);
-  player.cooldown = st.delay * (w.infinite ? 1 + 2 * (1 - player.spin) : 1);
+  player.cooldown = st.delay * (w.infinite ? 1 + 2 * (1 - player.spin) : 1) / Math.max(0.3, 1 + player.fx.atkSpeed / 100);
   if (w.melee) {
     game.slash = player.angle; game.slashT = 200; game.slashR = st.range; game.slashA = w.arc;
     sfx.shot(w);
@@ -175,13 +256,13 @@ function attack() {
     }
     return;
   }
-  let mx = player.x + Math.cos(player.angle) * (w.len + 12), my = player.y + Math.sin(player.angle) * (w.len + 12), aim = player.angle;
-  const mz = muzzlePoint(); // personagem novo: sai da ponta do cano e vai na direção do mouse
-  if (mz) {
-    mx = mz.x; my = mz.y;
-    const tx = mouse.x + cam.x, ty = mouse.y + cam.y;
-    if (Math.hypot(tx - mx, ty - my) > 40) aim = Math.atan2(ty - my, tx - mx);
-  }
+  // Direção do projétil = direção estável do corpo/arma, NUNCA
+  // vetor da ponta do cano até o mouse (que inverte perto do corpo).
+  const aim = player.angle;
+  let mx = player.x + Math.cos(aim) * (w.len + 12);
+  let my = player.y + Math.sin(aim) * (w.len + 12);
+  const mz = muzzlePoint();
+  if (mz) { mx = mz.x; my = mz.y; }
   player.shotAng = aim;
   const n = w.pellets || 1;
   for (let i = 0; i < n; i++) {
@@ -255,8 +336,8 @@ function makeZombie(x, y, type, zone) {
     demon:    { skin: "#9a2a22", cloth: "#2a0a0a" }
   }[type];
   const z = Object.assign({
-    x, y, r: t.r, type, zone, row: zone, hp, maxHp: hp, dmg: (8 + sub) * t.dmg * R.dmg, hitDelay: t.hitDelay || 750,
-    speed: Math.min(2.9, (0.7 + Math.random() * 0.35 + reg * 0.1 + sub * 0.02) * t.spd), hitCd: 0, angle: Math.random() * 6.283,
+    netId: crypto.randomUUID(), x, y, r: t.r, type, zone, row: zone, hp, maxHp: hp, dmg: (8 + sub) * t.dmg * R.dmg, hitDelay: t.hitDelay || 750,
+    speed: Math.min(2.9, (0.7 + Math.random() * 0.35 + reg * 0.1 + sub * 0.02) * t.spd) * (type === "dog" ? 0.8 : 1), hitCd: 0, angle: Math.random() * 6.283,
     burn: 0, bleed: 0, stun: 0, chargeCd: 2000 + Math.random() * 2000, chargeT: 0, windT: 0, slamCd: 1500, slamT: 0,
     skin: pick(ZSKIN), cloth: pick(ZCLOTHES), anim: Math.random() * 10, flash: 0, spitCd: 1500 + Math.random() * 1500,
     stuckT: 0, detourT: 0, detourDir: 1, stains: [Math.random(), Math.random(), Math.random()], lunge: 0
@@ -300,10 +381,11 @@ function killZombie(z) {
   if (player.fx.killHeal) player.hp = Math.min(player.maxHp, player.hp + player.fx.killHeal);
   const zt0 = ZTYPES[z.type];
   if (zt0.gas && !z.boss) { addHazard(z.x, z.y, 70, 4500, 6 + diffOf(z.zone) * 3, "gas"); }
+  if (zt0.blastDeath && !z.boss && !z.lastMelee) creeperBlast(z);
   if (zt0.acidDeath && !z.boss) { addHazard(z.x, z.y, 60, 5000, 8 + diffOf(z.zone) * 4, "acid"); acidSplash(z.x, z.y); if (Math.hypot(player.x - z.x, player.y - z.y) < 70) damagePlayer(z.dmg * 0.8); }
   if (z.bossId === "matriarca" || z.bossId === "pestilento") addHazard(z.x, z.y, 120, 8000, 15 + diffOf(z.zone) * 5, "acid");
   missionProgress("kill", 1); missionProgress("killcat", 1, curW().cat); missionProgress("killtype", 1, z.type);
-  sfx.kill();
+  sfx.kill(z); // morte com distância, panorâmica e abafamento
   bloodSpray(z.x, z.y, Math.random() * 6.283, 14);
   addBlood(z.x, z.y, z.r * 1.4);
   const corpses = curCorpses(), zx = ZTYPES[z.type].xp;
@@ -326,9 +408,22 @@ function killZombie(z) {
     if (corpses.length > 30) { const i = corpses.findIndex((c) => c.table !== "boss"); if (i >= 0) corpses.splice(i, 1); }
   }
 }
+// Rastejante abatido a distância: explode (fere quem estiver perto, inclusive outros zumbis e o jogador)
+const CREEPER_BLAST_R = 78;
+function creeperBlast(z) {
+  const reg = diffOf(z.zone);
+  explode(z.x, z.y, CREEPER_BLAST_R, 70 + reg * 45);
+  const d = Math.hypot(player.x - z.x, player.y - z.y);
+  if (d < CREEPER_BLAST_R + 12) damagePlayer(z.dmg * 2.2 * (1 - 0.6 * d / (CREEPER_BLAST_R + 12)));
+  for (let i = 0; i < 16; i++) {               // fumaça escura da criatura
+    const a = Math.random() * 6.283, s = rand(0.6, 2.4);
+    game.parts.push({ x: z.x, y: z.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.4, life: rand(500, 900), max: 900, color: pick(["#1a1418", "#2a2028", "#3a1a22"]), size: rand(4, 8), fr: 0.92 });
+  }
+}
 function damagePlayer(dmg) {
-  if (adm.god) return;
-  const d = dmg * (1 - Math.max(-0.5, Math.min(0.7, player.fx.thick / 100))) * (1 - armorRed());
+  if (adm.god || performance.now() < (player.defyUntil || 0)) return;
+  // Teto por ataque evita morte instantânea mesmo na Zona Morta.
+  const d = Math.min(dmg * (1 - armorRed()), Math.max(6, player.maxHp * 0.28));
   player.hp -= d;
   wearVest(d);
   game.hurtT = 350; game.shake = Math.min(12, game.shake + 3 + d * 0.15);
@@ -347,6 +442,9 @@ function updateBullets(dt, k) {
       if (ob) {
         b.life = 0;
         if (ob.kind === "car") carHit(ob, b.dmg);
+        if (!b.fire && Math.random() < 0.32)
+          fmPlaySample(ob.kind === "car" || ob.kind === "fence" ? "hit_metal" : "hit_concrete",
+            { x:b.x, y:b.y, volume:.26 });
         if (b.explode) explode(b.x, b.y, b.explode, b.dmg * (b.grenade ? 1 : 0.5)); else if (!b.fire) sparks(b.x, b.y);
         break;
       }
@@ -501,12 +599,6 @@ function updateZombies(dt, k) {
       let ang = Math.atan2(dy, dx);
       if (z.detourT > 0) { z.detourT -= dt; ang += z.detourDir * 1.2; }
       step = z.speed * k;
-      // O errante cambaleia na aproximação e firma a passada perto da mordida.
-      if (z.type === "walker" && !z.boss && d > z.r + player.r + 12 && z.detourT <= 0) {
-        const sway = Math.sin(z.anim * 0.9);
-        ang += sway * 0.22;
-        step *= 1 + 0.14 * Math.cos(z.anim * 0.9);
-      }
       // cão recua depois de morder
       if (z.recoilT > 0) { z.recoilT -= dt; ang += Math.PI; step = z.speed * 0.6 * k; }
       // infectado desvia quando você mira nele
@@ -528,7 +620,7 @@ function updateZombies(dt, k) {
       z.angle = Math.atan2(dy, dx);
       z.lose = d > 560 ? z.lose + dt : 0;
       if (z.lose > 6000) { z.state = "idle"; z.wt = 0; }
-      if (Math.random() < dt / 5000) sfx.groan(clamp(1 - d / 700, 0, 1));
+      if (Math.random() < dt / 5000) sfx.groan(clamp(1 - d / 700, 0, 1), z);
     } else step = wander(z, k, dt);
     pushOut(z, z.r);
     if (game.inside) { z.x = clamp(z.x, 56, IW() - 56); z.y = clamp(z.y, 56, IH() - 56); }
@@ -542,6 +634,11 @@ function updateZombies(dt, k) {
     }
     z.anim += Math.abs(step) * 0.12;
     z.hitCd -= dt;
+    // Colosso: você empurra os infectados comuns; correndo, derruba (e corta o cuspe)
+    if (player.flags.jugger && !z.boss && d < z.r + player.r + 4) {
+      z.x -= (dx / d) * 3; z.y -= (dy / d) * 3;
+      if (player.sprinting) { z.stun = 700; z.spitCd = Math.max(z.spitCd || 0, 1500); z.hitCd = Math.max(z.hitCd, 400); continue; }
+    }
     if (d < z.r + player.r + 2 && z.hitCd <= 0) { alertZombie(z); damagePlayer(z.dmg); addInfection(z); z.hitCd = z.hitDelay; z.lunge = 160; if (z.type === "dog") z.recoilT = 400; }
   }
   for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {

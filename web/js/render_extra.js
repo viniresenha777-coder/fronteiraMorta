@@ -167,27 +167,64 @@ function drawZombieExtra(z) {
   }
 }
 
-// ---------- Corpos de sobreviventes na rua ----------
+// ---------- Cadáveres infectados nas ruas ----------
+// Os 4 sprites vieram do ZIP do criador, removidos os fundos quadrados.
+// A variante depende da posição e da semente da área: nunca muda no reload.
+const DEAD_ZOMBIES_IMG = new Image();
+DEAD_ZOMBIES_IMG.src = "img/zombies_dead_4.webp?v=20261116-four-corpses1";
+function deadZombieVariant(o) {
+  const cx = Math.floor(o.x + o.w / 2), cy = Math.floor(o.y + o.h / 2);
+  const seed = world && world.cell ? world.cell.seed >>> 0 : 0;
+  const h = (Math.imul(cx, 73856093) ^ Math.imul(cy, 19349663) ^ seed) >>> 0;
+  return h % 4;
+}
 function drawBody(o) {
-  ctx.save(); ctx.translate(o.x + o.w / 2, o.y + o.h / 2); ctx.rotate(o.ang);
-  ctx.fillStyle = "rgba(80,6,6,0.45)"; ellipse(3, 2, 20, 13);
-  ctx.fillStyle = o.pants; ctx.fillRect(-16, -5, 10, 4); ctx.fillRect(-16, 1, 10, 4);
-  ctx.strokeStyle = o.skin; ctx.lineWidth = 3; ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(6, -15); ctx.moveTo(0, 6); ctx.lineTo(10, 10); ctx.stroke();
-  ctx.fillStyle = o.cloth; ellipse(0, 0, 8, 7);
-  if (o.bag) { ctx.fillStyle = "#5a4a32"; ctx.fillRect(-6, -9, 7, 5); }
-  ctx.fillStyle = o.skin; circle(10, 0, 4.5);
-  ctx.fillStyle = "#2a1e14"; ctx.beginPath(); ctx.arc(9, 0, 4.6, Math.PI * 0.5, Math.PI * 1.5); ctx.fill();
-  ctx.restore();
-  if (!o.opened) sparkle(o.x + o.w, o.y);
+  const x = o.x + o.w / 2, y = o.y + o.h / 2;
+  const active = lootSpotActive(o);
+  if (DEAD_ZOMBIES_IMG.complete && DEAD_ZOMBIES_IMG.naturalWidth) {
+    ctx.save();
+    if (active) {
+      // Sinal discreto de saque: brilho ATRÁS, sem amarelar nem ocultar o corpo.
+      const glow = ctx.createRadialGradient(x, y, 4, x, y, 42);
+      glow.addColorStop(0, "rgba(255,219,110,0.28)");
+      glow.addColorStop(0.6, "rgba(255,199,84,0.12)");
+      glow.addColorStop(1, "rgba(255,195,66,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(x, y, 42, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowColor = "rgba(255,221,122,0.62)";
+      ctx.shadowBlur = 8;
+    }
+    const v = deadZombieVariant(o), tile = 256, size = 72;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.filter = active ? "brightness(1.24) contrast(1.08)" : "brightness(1.17) contrast(1.06)";
+    ctx.drawImage(DEAD_ZOMBIES_IMG, (v % 2) * tile, Math.floor(v / 2) * tile, tile, tile,
+      x - size / 2, y - size / 2, size, size);
+    ctx.restore();
+  } else {
+    // Fallback enquanto a imagem é carregada (não deixa corpos invisíveis).
+    ctx.save(); ctx.translate(x, y); ctx.rotate(o.ang || 0);
+    ctx.fillStyle = "rgba(80,6,6,0.45)"; ellipse(3, 2, 20, 13);
+    ctx.fillStyle = o.pants || "#454039"; ctx.fillRect(-16, -5, 10, 4); ctx.fillRect(-16, 1, 10, 4);
+    ctx.strokeStyle = o.skin || "#8d826a"; ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(6, -15); ctx.moveTo(0, 6); ctx.lineTo(10, 10); ctx.stroke();
+    ctx.fillStyle = o.cloth || "#40483c"; ellipse(0, 0, 8, 7);
+    if (o.bag) { ctx.fillStyle = "#5a4a32"; ctx.fillRect(-6, -9, 7, 5); }
+    ctx.fillStyle = o.skin || "#8d826a"; circle(10, 0, 4.5);
+    ctx.restore();
+  }
+  // Sem saque real não aparece ? nem luz amarela.
+  if (active) drawLootQuestion(o, x, y - 30);
 }
 
 // ---------- Carros explosivos ----------
 function carUnder(c) {
   if (!c.explosive || c.burnt) return;
+  // Marca discreta de óleo no chão. A mancha roxa deslocada da versão
+  // anterior fazia carros abandonados parecerem suspensos.
   const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
-  ctx.fillStyle = "rgba(20,20,30,0.55)"; ellipse(cx + 8, cy + 12, 22, 12);
-  ctx.fillStyle = `rgba(120,90,200,${0.12 + 0.06 * Math.sin(game.time / 500 + cx)})`; ellipse(cx + 12, cy + 14, 10, 5);
+  ctx.fillStyle = "rgba(16,18,16,0.18)";
+  ellipse(cx + 1, cy + 1, c.w * 0.28, c.h * 0.28);
 }
 function carOver(c) {
   const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
@@ -239,38 +276,51 @@ const BONUS_TXT = {
   thick: (v) => `${sgn(-v)}% dano recebido`, greed: (v) => `${sgn(v)}% dinheiro`, agility: (v) => `${sgn(v)}% velocidade`, saver: (v) => `${v}% poupa bala`,
   implantLoot: (v) => `${sgn(v)}% implantes`, rage: (v) => `${sgn(v)}% dano com pouca vida`, killHeal: (v) => `+${v} vida por abate`,
   lootSense: (v) => `faro de saque ${v}`, luck: (v) => `${sgn(v)}% raridade`, accImp: (v) => `${sgn(-v)}% dispersão`, stealthImp: (v) => `${sgn(v)}% furtividade`,
-  craftDisc: (v) => `${sgn(-v)}% preço oficina`, critDmg: (v) => `${sgn(v)}% dano crítico`, leech: (v) => `${v}% dano vira vida`, adren: (v) => `${sgn(v)}% veloc. com pouca vida`
+  craftDisc: (v) => `${sgn(-v)}% preço oficina`, critDmg: (v) => `${sgn(v)}% dano crítico`, leech: (v) => `${v}% dano vira vida`, adren: (v) => `${sgn(v)}% veloc. com pouca vida`,
+  armorFind: (v) => `${sgn(v)}% chance de coletes`, ammoLoot: (v) => `${sgn(v)}% munição achada`, searchSpeed: (v) => `${sgn(v)}% velocidade de busca`,
+  miscFind: (v) => `${sgn(v)}% materiais`, lootSpots: (v) => `${sgn(v)}% lugares com saque`, atkSpeed: (v) => `${sgn(v)}% velocidade de ataque`,
+  deathDefy: (v) => `${v}% de sobreviver a golpe fatal`, bossRare: (v) => `${sgn(v)}% raridade nos chefes`, mcChance: (v) => `${sgn(v)}% armas com melhorias`
 };
 // efeitos onde o número negativo é bom para o jogador
 const NEG_GOOD = [];
 function sgn(v) { v = Math.round(v * 100) / 100; return v > 0 ? `+${v}` : `${v}`; }
 function activeBonuses() {
-  const out = [], fx = player.fx || {};
+  const out = [], fx = { ...(player.fx || {}) };
+  const vest = save.vest >= 0 ? VESTS[save.vest] : null, w = curW();
+  fx.thick = armorRed() * 100;
+  fx.vigor = (fx.vigor || 0) + (vest ? vest.hp || 0 : 0);
+  fx.stealthImp = (fx.stealthImp || 0) + (vest ? vest.stealth || 0 : 0);
+  fx.crit = (fx.crit || 0) + (w.crit || 0);
+  fx.exp = (xpMult() - 1) * 100;
+  fx.greed = (moneyMult() - 1) * 100;
+  const slow = player.flags.jugger ? 0 : (vest ? vest.slow || 0 : 0) + (w.slow || 0);
+  fx.agility = ((1 + ((fx.agility || 0) + vestSpeedBonus()) / 100) * (1 - slow / 100) - 1) * 100;
   // de onde vem cada efeito (nomes dos implantes)
   const src = {};
-  for (const im of save.installed) { for (const k in IMP[im.id].fx) (src[k] = src[k] || []).push(implantName(im)); if (im.neg) (src[im.neg.key] = src[im.neg.key] || []).push(implantName(im) + " (erro)"); }
-  for (const k of STAT_KEYS) {
+  save.installed.forEach((im, i) => { const f = implantFx(im, i, save.installed); for (const k in f) (src[k] = src[k] || []).push(implantName(im)); });
+  const source = (k, label) => (src[k] = src[k] || []).push(label);
+  const profession = prof();
+  if (profession && profession.fx) for (const k in profession.fx) source(k, `Profissão: ${profession.name}`);
+  if (vest) for (const [field, key] of [["armor", "thick"], ["hp", "vigor"], ["stealth", "stealthImp"], ["slow", "agility"]])
+    if (vest[field]) source(key, `Colete: ${vest.name}`);
+  if (vestSpeedBonus()) source("agility", `Melhoria: ${vest.name}`);
+  if (A("armor")) source("thick", `Armadura: ${A("armor")}`);
+  if (w.crit) source("crit", `Arma: ${w.name}`);
+  if (w.slow) source("agility", `Arma: ${w.name}`);
+  if (vipActive()) { source("exp", "VIP"); source("greed", "VIP (dinheiro x2)"); }
+  const bonusKeys = ["exp", "greed", ...STAT_KEYS.filter(k => k !== "exp" && k !== "greed")];
+  for (const k of bonusKeys) {
     const v = fx[k];
     if (!v || !BONUS_TXT[k]) continue;
     const bad = ["reload", "endurance", "metabolism", "thick", "silence", "accImp", "craftDisc"].includes(k) ? false : v < 0;
     const good = ["thick", "silence", "reload", "endurance", "metabolism", "accImp", "craftDisc"].includes(k) ? v > 0 : v > 0;
-    out.push({ icon: "◆", text: BONUS_TXT[k](v), from: `Implantes: ${(src[k] || []).join(", ")}`, color: good && !bad ? "#8fd08a" : "#e07b5a" });
+    out.push({ icon: "◆", text: BONUS_TXT[k](v), from: (src[k] || []).join(", "), color: vipActive() && (k === "exp" || k === "greed") ? "#ffd25a" : good && !bad ? "#8fd08a" : "#e07b5a" });
   }
-  if (save.vest >= 0) { const v = VESTS[save.vest]; out.push({ icon: "▣", text: `-${v.armor}% dano recebido`, from: `Colete: ${v.name}`, color: "#8fb3ff" });
-    if (v.hp) out.push({ icon: "▣", text: `+${v.hp} vida máxima`, from: `Colete: ${v.name}`, color: "#8fb3ff" });
-    if (v.acid) out.push({ icon: "▣", text: `-${v.acid}% dano de ácido`, from: `Colete: ${v.name}`, color: "#8fb3ff" });
-    if (v.stealth) out.push({ icon: "▣", text: `+${v.stealth}% furtividade`, from: `Colete: ${v.name}`, color: "#8fb3ff" });
-    if (v.slow) out.push({ icon: "▣", text: `-${v.slow}% velocidade`, from: `Colete: ${v.name}`, color: "#e07b5a" }); }
-  const arm = Math.round((A("armor") / (A("armor") + 150)) * 100);
-  if (arm > 6) out.push({ icon: "●", text: `-${arm}% dano recebido`, from: `Atributo Armadura ${A("armor")}`, color: "#c9c4ad" });
-  if (save.gm) out.push({ icon: "★", text: "+100% XP · dinheiro x2", from: "VIP", color: "#ffd25a" });
-  const w = curW();
+  if (vest && vest.acid) out.push({ icon: "▣", text: `-${vest.acid}% dano de ácido`, from: `Colete: ${vest.name}`, color: "#8fb3ff" });
   if (w.burn) out.push({ icon: "✦", text: `fogo ${w.burn}/s`, from: `Arma: ${w.name}`, color: "#ffb070" });
   if (w.bleed) out.push({ icon: "✦", text: `${Math.round(w.bleed * 100)}% sangramento`, from: `Arma: ${w.name}`, color: "#ffb070" });
   if (w.stun) out.push({ icon: "✦", text: `${Math.round(w.stun * 100)}% atordoar`, from: `Arma: ${w.name}`, color: "#ffb070" });
-  if (w.crit) out.push({ icon: "✦", text: `+${w.crit}% crítico`, from: `Arma: ${w.name}`, color: "#ffb070" });
   if (w.lifesteal) out.push({ icon: "✦", text: `${w.lifesteal * 100}% roubo de vida`, from: `Arma: ${w.name}`, color: "#ffb070" });
-  if (w.slow) out.push({ icon: "✦", text: `-${w.slow}% velocidade`, from: `Arma: ${w.name}`, color: "#e07b5a" });
   if (fx.rage && player.hp / player.maxHp < 0.4) out.push({ icon: "!", text: `DESESPERO ATIVO +${fx.rage}% dano`, from: "Vida abaixo de 40%", color: "#ff6a4a" });
   if (fx.adren && player.hp / player.maxHp < 0.5) out.push({ icon: "!", text: `ADRENALINA +${fx.adren}% velocidade`, from: "Vida abaixo de 50%", color: "#ff6a4a" });
   if (inSafe()) out.push({ icon: "+", text: "+1,5 vida/s (descanso)", from: "Dentro de um posto seguro", color: "#8fd08a" });

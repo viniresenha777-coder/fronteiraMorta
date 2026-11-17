@@ -1,0 +1,44 @@
+/* Identidade visual do acesso online Fronteira Morta */
+[hidden] { display: none !important; }
+html { background: #070b0a; }
+body { background: #070b0a; }
+.fm-auth {
+  min-height: 100svh; display: grid; place-items: center;
+  background: radial-gradient(ellipse at 50% 15%, #26362c 0%, #101914 40%, #070b0a 100%);
+  padding: 24px; box-sizing: border-box; color: #e9e7d7;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.fm-auth-panel {
+  width: min(100%, 440px); padding: clamp(22px, 5vw, 40px);
+  background: rgba(11, 17, 14, .96); border: 1px solid #6b5c36;
+  border-radius: 14px; box-shadow: 0 25px 80px #000b;
+}
+.fm-auth-kicker { color: #baa35d; font-size: 12px; letter-spacing: .25em; text-transform: uppercase; margin: 0 0 8px; }
+.fm-auth h1 { color: #f3e9b5; font-size: clamp(27px, 6vw, 36px); margin: 0 0 5px; line-height: 1.1; }
+.fm-auth-sub { margin: 0 0 24px; color: #b2b7a9; font-size: 14px; line-height: 1.5; }
+.fm-auth label { display: grid; gap: 7px; margin: 12px 0; font-size: 14px; font-weight: 600; }
+.fm-auth input:not([type=checkbox]) {
+  box-sizing: border-box; width: 100%; border: 1px solid #5b654c; border-radius: 7px; color: #f7f4e6;
+  background: #1a231d; padding: 12px 13px; font: inherit; outline-offset: 2px;
+}
+.fm-auth input:focus-visible, .fm-auth button:focus-visible { outline: 2px solid #c9aa40; }
+.fm-auth-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 19px; }
+.fm-auth button { border: 1px solid #c9aa40; border-radius: 8px; font: 600 15px system-ui; padding: 12px 10px; cursor: pointer; }
+.fm-auth button.primary { background: #5d4b26; color: #fff2c0; }
+.fm-auth button.secondary { background: #202821; color: #e9e7d7; }
+.fm-auth button.textual { border: 0; background: transparent; color: #d6b85a; padding: 10px 0; font-size: 13px; margin-top: 8px; }
+.fm-auth button:disabled { cursor: wait; opacity: .6; }
+.fm-auth p[role=status] { margin: 14px 0 0; min-height: 34px; font-size: 13px; color: #c7d6ba; line-height: 1.45; }
+.fm-auth p[role=status].error { color: #ffb5a6; }
+.fm-auth .fm-import { font-weight: 400; display: flex; gap: 8px; align-items: flex-start; color: #d5d1b8; font-size: 13px; line-height: 1.5; }
+.fm-auth .fm-import input { margin-top: 3px; accent-color: #b59c47; }
+.fm-auth small { display: block; color: #8f998a; font-size: 12px; margin-top: 15px; line-height: 1.5; }
+
+.fm-auth .fm-auth-actions:has(> button:only-child) { grid-template-columns: 1fr; }
+.fm-auth-return {
+  display: inline-block; margin-top: 16px;
+  color: #d6b85a; font-size: 14px; font-weight: 600;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.fm-auth-return:hover { color: #f2d780; }
+.fm-auth-panel > p#reset-success { color: #b8dfad; line-height: 1.5; font-size: 14px; }

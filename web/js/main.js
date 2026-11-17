@@ -60,11 +60,55 @@ function resetGame() {
   manageRows();
   if (!save.name) openNameScreen(false); // personagem novo: primeiro o nome, depois a profissão
   else if (!save.prof) game.menu = "prof";
-  game.banner = { text: "Fronteira Morta", sub: "Refúgio · entre (E) para usar loja, oficina, banco e missões · N abre o mapa de áreas", t: 4200, gold: true };
+  game.banner = { text: "Fronteira Morta", sub: "Refúgio · entre (E) para oficina, banco, clínica e missões · I abre Mensagens", t: 4200, gold: true };
 }
 
+
+function useResetStatsCard() {
+  const it = player.pack.find(x => x && x.kind === "mat" && x.id === "reset_stats" && x.qty > 0);
+  if (!it) { toast("Você não possui um cartão de reset."); return; }
+  let normal = 0, weapons = 0;
+  ATTRS.forEach(a => {
+    const invested = Math.max(0, Math.round((player.attrs[a.id] || a.start) - a.start));
+    if (WEAPON_SKILL_IDS.includes(a.id)) weapons += invested;
+    else normal += invested;
+    player.attrs[a.id] = a.start;
+  });
+  player.points += normal;
+  player.wpoints += weapons;
+  it.qty--;
+  if (!it.qty) player.pack.splice(player.pack.indexOf(it), 1);
+  recalcImplants();
+  player.hp = Math.min(player.hp, player.maxHp);
+  syncChar();
+  checkpoint("uso do cartão de reset de stats");
+  game.menu = "stats"; game.stab = 0; game.cur = 0;
+  toast("Atributos resetados! Redistribua seus pontos.");
+}
+
+// Consumo da Trindade: 100 anos de calendário desde a ativação.
+function useTrindadeItem() {
+  const it = player.pack.find(x => x && x.kind === "mat" && x.id === "trindade_eterna" && x.qty > 0);
+  if (!it) { toast("Você não possui uma Trindade."); return; }
+  const exp = new Date(Math.max(Date.now(), Number(save.trindadeUntil) || 0));
+  exp.setUTCFullYear(exp.getUTCFullYear() + 100);
+  if (!Number.isFinite(exp.getTime())) { toast("Erro ao calcular validade."); return; }
+  it.qty--;
+  if (!it.qty) player.pack.splice(player.pack.indexOf(it), 1);
+  save.trindadeUntil = exp.getTime();
+  checkpoint("uso da Trindade");
+  toast("Trindade ativada: +35% de dano, corrida e armadura por 100 anos!");
+}
 // ---------- Controles ----------
-function audioStart() { sndInit(); if (SND.ac) { musicSetOn(save.music); musicStart(); } }
+function audioStart() {
+  sndInit();
+  if (SND.ac) {
+    musicSetOn(save.music);
+    musicStart();
+    fmAudioAssetsStart(); // efeitos sonoros militares e zumbis, carregados sob demanda
+    fmAmbientStart(); // trilha do ZIP Ambiente sond, só após gesto do jogador
+  }
+}
 window.addEventListener("keydown", (e) => {
   audioStart();
   const k = e.key.toLowerCase();
@@ -73,18 +117,28 @@ window.addEventListener("keydown", (e) => {
   if (["tab", " ", "arrowup", "arrowdown", "arrowleft", "arrowright", "backspace", "f2"].includes(k)) e.preventDefault();
   if (e.repeat && !game.menu) return;
   if (k === "f2") { toggleAdmin(); return; }
-  if (game.over) { if (k === "enter") resetGame(); return; }
+  if (game.over) { if (k === "enter") respawnPlayer(); return; }
   if (game.quitting) return;
+  if (game.menu === "pack" && game.found) { menuKey(k); return; } // mochila sobre loot: preserva a oferta
   if (game.found) { foundKey(k); return; }
+  if (k === "u" && !e.repeat && !game.shop && !game.over && !game.menu) {
+    openFriends();
+    return;
+  }
   if (game.menu) { menuKey(k); return; }
   if (game.shop) { shopKey(k); return; }
   if (game.hub && (k === "escape" || k === "e")) { leaveHouse(); return; }
   if (game.hub && (k === "r" || k === "f" || k === "p" || k === "l")) { if (k === "f") eat(); return; }
-  if (game.paused) { if (k === "escape" || k === "p") togglePause(); return; }
+  if (game.paused) {
+    if ((k === "escape" || k === "p") && game.settingsOpen) {
+      game.settingsOpen = false; game.settingsDrag = null;
+    } else if (k === "escape" || k === "p") togglePause();
+    return;
+  }
   if (k === "escape" && game.sectorMap) { game.sectorMap = false; return; }
   if (k === "escape" || k === "p") { togglePause(); return; }
   if (k === "b") { game.menu = "pack"; mouse.down = false; return; }
-  if (k === "l") { openShop(); return; }
+  // A tecla L não abre mais a loja. O painel visual continua no refúgio.
   if (k === "k") { sndMute(!SND.muted); save.muted = SND.muted; persist(); toast(SND.muted ? "Som desligado" : "Som ligado"); return; }
   if (k === "n") { game.menu = "map"; game.mapSel = { cx: world.cell.cx, cy: world.cell.cy }; return; }
   if (k === "o") { game.menu = "obj"; game.oscroll = 0; return; }
@@ -96,7 +150,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "f") eat();
   else if (k === "g") drink();
   else if (k === "h") heal();
-  else if (k === "i") useAnti();
+  else if (k === "i") openMessages();
   else if (k === "c") { game.menu = "stats"; game.cur = 0; }
   else if (k === "m") { game.sectorMap = !game.sectorMap; }
   else if (n >= 1 && n <= SLOT_N) selectWeapon(n - 1);
@@ -107,16 +161,30 @@ canvas.addEventListener("mousemove", (e) => {
   const r = canvas.getBoundingClientRect();
   mouse.x = (e.clientX - r.left) * (W / r.width);
   mouse.y = (e.clientY - r.top) * (H / r.height);
+  if (game.menu === "pack") invMouseMove(mouse.x, mouse.y);
+  if (game.paused && game.settingsOpen && game.settingsDrag) pauseSettingsDrag(mouse.x);
+  portraitMouseMove(mouse.x);
 });
 canvas.addEventListener("mousedown", (e) => {
   audioStart();
   if (e.button !== 0) return;
   const r = canvas.getBoundingClientRect();
   mouse.x = (e.clientX - r.left) * (W / r.width); mouse.y = (e.clientY - r.top) * (H / r.height);
+  // boneco 3D (inventário ou painel da base): arrastar gira; clique simples resolvido ao soltar
+  const spinOk = (game.menu === "pack" && !INV.confirm && !allocOpen()) ||
+    (game.hub && !game.menu && !game.shop && !game.found && !game.paused && !game.over && !game.quitting);
+  if (spinOk && portraitMouseDown(mouse.x, mouse.y)) return;
+  // inventário: começa a arrastar um item (o clique simples é resolvido ao soltar)
+  if (game.menu === "pack" && !INV.confirm && !allocOpen() && invMouseDown(mouse.x, mouse.y)) return;
   if (game.found || game.menu || game.shop || game.paused || game.over || game.hub || game.quitting) { handleClick(mouse.x, mouse.y); return; }
   mouse.down = true;
 });
-window.addEventListener("mouseup", () => { mouse.down = false; });
+window.addEventListener("mouseup", () => {
+  mouse.down = false;
+  game.settingsDrag = null;
+  portraitMouseUp();
+  if (INV.drag) { if (game.menu === "pack") invMouseUp(mouse.x, mouse.y); else INV.drag = null; }
+});
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
@@ -132,11 +200,11 @@ function update(dt) {
   if (game.trans) { transTick(dt); return; } // trocando de área (tela escura)
   const k = dt / 16.67, sec = dt / 1000;
   game.time += dt;
-  game.clock += sec * 3; // 1 dia = 8 minutos reais
+  // Horário da cidade sincronizado pelo servidor em fmWorld.tick().
 
   const meta = 1 - Math.min(0.8, player.fx.metabolism / 100);
-  player.hunger = Math.max(0, player.hunger - 0.12 * sec * meta);
-  player.thirst = Math.max(0, player.thirst - 0.17 * sec * meta);
+  player.hunger = Math.max(0, player.hunger - 0.084 * sec * meta);
+  player.thirst = Math.max(0, player.thirst - 0.119 * sec * meta);
   if (adm.noHunger) { player.hunger = 100; player.thirst = 100; }
   const fed = player.hunger > 0 && player.thirst > 0;
   if (fed && player.fx.regen > 0) player.hp = Math.min(player.maxHp, player.hp + player.fx.regen * sec);
@@ -156,17 +224,44 @@ function update(dt) {
   if (adm.infStamina) { player.stamina = 100; player.exhausted = false; }
   game.objT -= dt;
   if (game.objT <= 0) { game.objT = 1000; objectivesTick(); }
-  eventsTick(dt);
+  if (!fmWorld.isFollower()) eventsTick(dt);
   gfxTick(dt);
+  // Aceleração/desaceleração curta, baseada em dt: elimina o aspecto de
+  // deslocamento aos solavancos sem alterar a velocidade máxima do personagem.
+  let goalVX = 0, goalVY = 0;
   if (moving) {
-    const slow = (save.vest >= 0 ? VESTS[save.vest].slow || 0 : 0) + (curW().slow || 0) - (player.fx.adren && player.hp / player.maxHp < 0.5 ? player.fx.adren : 0);
-    player.moveAng = Math.atan2(dy, dx);
-    const len = Math.hypot(dx, dy), sp = (sprinting ? 3.38 * (1 + profVal("sprint")) : player.speed) * (1 + player.fx.agility / 100) * (1 + (A("agi") - 10) * 0.004) * (1 - slow / 100);
-    player.x += (dx / len) * sp * k; player.y += (dy / len) * sp * k;
-    player.animT = (player.animT || 0) + dt; player.lastSp = sp * k / Math.max(0.01, dt / 16.67);
-    if (!game.inside) save.stats.dist = S("dist") + sp * k;
-    player.walk += sp * k * 0.16;
-    if (sprinting && Math.random() < dt / 70) dust(player.x - (dx / len) * 8, player.y - (dy / len) * 8);
+    const slow = (player.flags.jugger ? 0 : (save.vest >= 0 ? VESTS[save.vest].slow || 0 : 0) + (curW().slow || 0)) - (player.fx.adren && player.hp / player.maxHp < 0.5 ? player.fx.adren : 0);
+    const len = Math.hypot(dx, dy);
+    const sp = (sprinting ? 3.38 * (1 + profVal("sprint")) : player.speed) *
+      (1 + (player.fx.agility + vestSpeedBonus()) / 100) *
+      (1 + (A("agi") - 10) * 0.004) * (1 - slow / 100) *
+      (sprinting && trindadeActive() ? 1.35 : 1);
+    goalVX = dx / len * sp; goalVY = dy / len * sp;
+  }
+  const motionLerp = 1 - Math.exp(-dt / 55);
+  player.moveVX = (player.moveVX || 0) + (goalVX - (player.moveVX || 0)) * motionLerp;
+  player.moveVY = (player.moveVY || 0) + (goalVY - (player.moveVY || 0)) * motionLerp;
+  const actualSpeed = Math.hypot(player.moveVX, player.moveVY);
+  player.walkBlend = (player.walkBlend || 0) + ((moving ? 1 : 0) - (player.walkBlend || 0)) * (1 - Math.exp(-dt / 100));
+  player.moving = actualSpeed > 0.08;
+  if (actualSpeed > 0.01) {
+    player.moveAng = Math.atan2(player.moveVY, player.moveVX);
+    // Movimento em passos curtos e por eixo: impede cruzar a hitbox
+    // de carros, paredes e contêineres em corridas rápidas ou lag.
+    // Ao encostar, o corpo desliza pelo obstáculo em vez de atravessá-lo.
+    const mvX = player.moveVX * k, mvY = player.moveVY * k;
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(mvX), Math.abs(mvY)) / 7));
+    for (let step = 0; step < steps; step++) {
+      player.x += mvX / steps;
+      pushOut(player, player.r);
+      player.y += mvY / steps;
+      pushOut(player, player.r);
+    }
+    player.animT = (player.animT || 0) + dt;
+    player.lastSp = actualSpeed;
+    if (!game.inside) save.stats.dist = S("dist") + actualSpeed * k;
+    player.walk += actualSpeed * k * 0.16;
+    if (sprinting && Math.random() < dt / 70) dust(player.x - player.moveVX / actualSpeed * 8, player.y - player.moveVY / actualSpeed * 8);
   }
   if (sprinting) {
     player.stamina -= 24 * sec * (1 - Math.min(0.8, player.fx.endurance / 100)) * (1 + profVal("stamina"));
@@ -182,9 +277,20 @@ function update(dt) {
   }
   pushOut(player, player.r);
   if (!game.inside && moving) edgeCheck(dx, dy);
+  // Atualiza a câmera ANTES de calcular o ângulo e disparar; isso elimina
+  // o frame de atraso entre ponteiro, cano da arma e projétil.
+  updateCam(dt);
   const ox = cam.x, oy = cam.y;
-  player.angle = Math.atan2(mouse.y + oy - player.y, mouse.x + ox - player.x);
+  // Zona morta da mira em torno do tronco: quando o mouse encosta no
+  // personagem, mantém a última direção válida. O pivô visual fica
+  // acima dos pés, onde o corpo realmente está desenhado.
+  const aimDX = mouse.x + ox - player.x;
+  const aimDY = mouse.y + oy - (player.y - 14);
+  if (Math.hypot(aimDX, aimDY) > 34) {
+    player.angle = Math.atan2(aimDY, aimDX);
+  }
   spriteTick(dt);
+  updateWeaponAim(); // arma, clarão e projétil seguem a mesma direção
 
   // tiro e recarga
   const w = curW(), inst = curInst();
@@ -207,26 +313,33 @@ function update(dt) {
   searchTick(dt);
   escortTick(dt, k);
   updateBullets(dt, k);
+  tickBaseGuards(dt);
   updateSpits(dt, k);
   updateHazards(dt);
   updateFuses(dt);
   updateParts(dt, k);
 
-  mapTick(dt);
+  if (!fmWorld.isFollower()) mapTick(dt);
   if (game.trans) return;
   if (!game.inside) {
     manageRows();
     const pr = world.cell.zone;
     game.spawnTimer -= dt;
-    if (game.spawnTimer <= 0) { trickleSpawn(); game.spawnTimer = Math.max(2500, 6500 - pr * 250) * (isNight() ? 0.7 : 1); }
+    if (game.spawnTimer <= 0) { if (!fmWorld.isFollower()) trickleSpawn(); game.spawnTimer = Math.max(2500, 6500 - pr * 250) * (isNight() ? 0.7 : 1); }
     world.corpses = world.corpses.filter((c) => (c.life -= dt) > 0);
   }
 
-  updateZombies(dt, k);
+  if (!fmWorld.isFollower()) updateZombies(dt, k);
+  else fmWorld.localZombieThreats(dt);
   zombies = zombies.filter((z) => z.hp > 0);
   if (game.inside) game.inside.zombies = game.inside.zombies.filter((z) => z.hp > 0);
   if (adm.god) player.hp = player.maxHp;
-  if (player.hp <= 0) { player.hp = 0; game.over = true; game.lost = game.money; mouse.down = false; stat("deaths"); clearRun(); }
+  if (player.hp <= 0 && Math.random() * 100 < player.fx.deathDefy) {       // Desafia-Morte
+    player.hp = Math.max(1, player.maxHp * 0.1); player.defyUntil = performance.now() + 1200;
+    game.banner = { text: "Golpe fatal evitado!", sub: "O implante Desafia-Morte te segurou em pé", t: 1800, gold: true };
+  }
+  lastStandTick();
+  if (player.hp <= 0) recordDeath();
 }
 
 function updateCam(dt) {
@@ -244,10 +357,11 @@ function draw() {
   if (game.hub && !game.over) {
     ctx = mainCtx; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     drawHub();
+    if (game.shop || game.menu || game.found) game.clicks = [];   // com um menu aberto, a base atrás não recebe clique
     if (game.shop) drawShop();
     if (game.menu) drawMenu();
-    if (game.found) drawFound();
-    if (game.banner && !game.menu && !game.shop) { const a = Math.min(1, game.banner.t / 500); ctx.globalAlpha = a; txt(game.banner.text, 566, 76, 18, game.banner.gold ? "#ffd96a" : "#e5e0c8", "center", true); ctx.globalAlpha = 1; }
+    if (game.found && game.menu !== "pack") drawFound();
+    if (game.banner && !game.menu && !game.shop) { const a = Math.min(1, game.banner.t / 500); ctx.globalAlpha = a; ctx.fillStyle = "rgba(8,9,7,0.82)"; rr(566 - 190, 57, 380, 28, 6); ctx.fill(); txt(game.banner.text, 566, 77, 18, game.banner.gold ? "#ffd96a" : "#e5e0c8", "center", true); ctx.globalAlpha = 1; }
     if (game.msgT > 0 && !game.menu && !game.shop) { ctx.globalAlpha = Math.min(1, game.msgT / 300); txt(game.msg, 566, H - 30, 14, "#ffd96a", "center", true, 560); ctx.globalAlpha = 1; }
     drawTransition();
     return;
@@ -261,6 +375,7 @@ function draw() {
   ctx.save();
   ctx.translate(-Math.round(cam.x) + shx, -Math.round(cam.y) + shy);
   if (game.inside) drawInterior(); else { drawWorld(); drawAirdrops(); }
+  drawGroundDrops(); // itens recusados continuam visíveis por 10s reais
   drawHazards();
   for (const p of game.pings) {
     const f = 1 - p.t / 350;
@@ -269,6 +384,7 @@ function draw() {
   }
   if (game.inside) {
     for (const z of Zs()) { drawZombie(z); drawZombieExtra(z); }
+    for (const online of fmSocial.inSector()) drawOnlinePlayer(online);
     drawProjectiles();
     if (game.escort && !game.over) drawSurvivor(game.escort.x, game.escort.y, game.escort.ang, game.escort.walk, game.escort.moving);
     if (!game.over && !drawPlayerSprite()) drawPlayer();
@@ -287,6 +403,7 @@ function draw() {
     drawScreenFx();
   }
   drawAtmosphere(); // cone da lanterna, neblina azulada e vinheta
+  applyGameBrightness(); // ajuste do jogador, sem modificar brilho dos menus/HUD
   // números de dano ficam acima da luz, sempre legíveis
   ctx.save();
   ctx.translate(-Math.round(cam.x) + shx, -Math.round(cam.y) + shy);
@@ -303,7 +420,7 @@ function draw() {
   if (game.sectorMap && !game.over && !game.menu && !game.shop && !game.found && !game.paused) drawSectorOverlay();
   if (game.shop && !game.over) drawShop();
   if (game.menu && !game.over) drawMenu();
-  if (game.found && !game.over) drawFound();
+  if (game.found && !game.over && game.menu !== "pack") drawFound();
   if (game.paused && !game.over && !game.menu && !game.shop) drawPause();
   if (game.over) drawGameOver();
   if (game.quitting) drawQuitScreen();
@@ -320,6 +437,9 @@ resetGame();
 loadSprites();
 ensureDaily();
 restoreRun(); // volta do último checkpoint, se houver
+fmGifts.start(); // correio: entrega presentes do ADM quando o jogo está pronto
+fmWorld.start(); // consulta relógio oficial do servidor Supabase
+if (save.name) fmSocial.start(); // publica posição somente após autenticação e nome definitivo
 // rodando pelo servidor local instalado: avisa que o jogo está aberto (o servidor fecha sozinho quando você sai)
 if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
   setInterval(() => { fetch("/__ping", { cache: "no-store" }).catch(() => {}); }, 15000);
@@ -337,10 +457,41 @@ function loop(now) {
   game.pings = game.pings.filter((p) => (p.t -= dt) > 0);
   game.flashes = game.flashes.filter((f) => (f.t -= dt) > 0);
   game.floats = game.floats.filter((f) => (f.t -= dt) > 0);
+  fmWorld.tick(); // relógio global e snapshots dos zumbis, inclusive durante pausas
+  floorPursuitTick(now); // perseguidores atravessam a escada após 2 segundos
+  groundDropsTick(now); // o prazo dos itens continua correndo mesmo com menus abertos
   update(dt);
   checkpointTick(dt);
-  updateCam(dt);
   draw();
-  requestAnimationFrame(loop);
+  
+
+requestAnimationFrame(loop);
 }
+// O VIP aparece apenas no rodapé HTML, nunca dentro do canvas.
+function refreshVipFooter() {
+  const el = document.getElementById("vip-footer");
+  if (!el) return;
+  let label, inactive = false;
+  if (save.gm) label = "★ VIP ATIVO · Sem vencimento";
+  else if (Number(save.vipUntil) > Date.now()) {
+    label = "★ VIP ATIVO · Expira em " + new Date(save.vipUntil).toLocaleDateString("pt-BR");
+  } else {
+    inactive = true;
+    label = Number(save.vipUntil) > 0 ? "VIP EXPIRADO" : "VIP INATIVO";
+  }
+  if (el.textContent !== label) el.textContent = label;
+  el.classList.toggle("inactive", inactive);
+}
+refreshVipFooter();
+setInterval(refreshVipFooter, 1000);
+// Somente os três bônus da Trindade ficam visíveis fora da área do jogo.
+function refreshTrindadeFooter() {
+  const el = document.getElementById("trindade-footer");
+  if (!el) return;
+  const active = trindadeActive();
+  el.hidden = !active;
+  if (active) el.textContent = "TRINDADE ATIVA · Dano +35% · Corrida +35% · Armadura +35%";
+}
+refreshTrindadeFooter();
+setInterval(refreshTrindadeFooter, 1000);
 requestAnimationFrame(loop);

@@ -5,6 +5,7 @@
 //  Os preços são provisórios: o jogo ainda não tem economia oficial.
 // =====================================================================
 const JUNK_RAR = [40, 130, 380, 950, 2400];          // piso de venda por raridade da arma
+const RESET_STATS_PRICE = MATS.reset_stats.price;
 const JUNK_CONS = { comum: 8, fresca: 16, podre: 2, water: 6, med: 25, anti: 40 };
 
 function weaponSellPrice(inst) {
@@ -20,7 +21,7 @@ function weaponParts(inst) {
   return out;
 }
 function partsText(p) { return Object.keys(p).map((k) => `${p[k]}x ${MATS[k].name}`).join(" + "); }
-function implantSellPrice(im) { return IMP[im.id].combo ? 1500 : SELL[im.tier - 1] || 60; }
+function implantSellPrice(im) { return IMP[im.id].scrap; }
 function matSellPrice(id) { return { sucata: 15, pecas: 35, eletronicos: 55, nucleo: 400, placa: 300 }[id] || 10; }
 function ammoSellPrice(t) { return Math.max(0.2, AMMO[t].price / AMMO[t].box * 0.3); }
 
@@ -29,6 +30,7 @@ function junkItems() {
   const L = [];
   player.slots.forEach((it, i) => { if (it) L.push({ kind: "weapon", it, where: "slot", i, name: instName(it), unit: weaponSellPrice(it), qty: 1, rare: WDEF[it.id].rar >= 2, sub: `slot ${i + 1}${player.cur === i ? " · na mão" : ""}` }); });
   player.pack.forEach((it) => {
+    if (it.kind === "mat" && it.id === "reset_stats") return; // cartão consumível não é revendido
     if (it.kind === "weapon") L.push({ kind: "weapon", it, where: "pack", name: instName(it), unit: weaponSellPrice(it), qty: 1, rare: WDEF[it.id].rar >= 2, sub: "mochila" });
     else if (it.kind === "mat") L.push({ kind: "mat", it, name: MATS[it.id].name, unit: matSellPrice(it.id), qty: it.qty, rare: it.id === "nucleo" || it.id === "placa", sub: "material" });
   });
@@ -37,7 +39,7 @@ function junkItems() {
   if (player.water > 0) L.push({ kind: "water", name: "Garrafa de água", unit: JUNK_CONS.water, qty: player.water, sub: "água" });
   if (player.med > 0) L.push({ kind: "med", name: "Kit médico", unit: JUNK_CONS.med, qty: player.med, sub: "remédio" });
   if (player.anti > 0) L.push({ kind: "anti", name: "Antibiótico", unit: JUNK_CONS.anti, qty: player.anti, sub: "remédio" });
-  player.bag.forEach((im) => L.push({ kind: "implant", im, name: implantName(im), unit: implantSellPrice(im), qty: 1, rare: im.tier >= 2 || !!IMP[im.id].combo, sub: "implante (não instalado)" }));
+  player.bag.forEach((im) => L.push({ kind: "implant", im, name: implantName(im), unit: implantSellPrice(im), qty: 1, rare: true, sub: "implante (não instalado)" }));
   VESTS.forEach((v, i) => { if (save.vestsOwned[i] && i !== save.vest) L.push({ kind: "vest", idx: i, name: v.name, unit: Math.round(v.price * 0.3 * (vestDur(i) / 100)) || 20, qty: 1, rare: v.rar >= 2, sub: `colete guardado · ${Math.round(vestDur(i))}%` }); });
   return L;
 }
@@ -84,6 +86,24 @@ function askDismantle(e) {
   if (e.rare) game.jconfirm = { text: `Desmontar ${e.name}?`, sub: `Você recebe ${partsText(weaponParts(e.it))}. A arma some.`, fn };
   else fn();
 }
+
+function buyResetStatsCard() {
+  if (!inSafe()) { toast("Compre o cartão no Ferro Velho da base."); return; }
+  if (game.money < RESET_STATS_PRICE) { toast("Dinheiro insuficiente para o cartão."); return; }
+  if (!addMat("reset_stats", 1)) { toast("Mochila cheia."); return; }
+  game.money -= RESET_STATS_PRICE;
+  sfx.buy();
+  checkpoint("compra de cartão de reset");
+  toast("Cartão Reset de Stats comprado! Abra a mochila (B) e arraste-o até o personagem.");
+}
+function confirmBuyResetStats() {
+  game.jconfirm = {
+    text: "Comprar Cartão Reset de Stats?",
+    sub: "Custa $" + RESET_STATS_PRICE.toLocaleString("pt-BR") + " · Uso único · Arraste no personagem",
+    fn: buyResetStatsCard
+  };
+}
+
 function junkKey(k) {
   const items = junkItems(), e = items[game.jcur | 0];
   if (game.jconfirm) {
@@ -92,6 +112,7 @@ function junkKey(k) {
     return;
   }
   if (k === "escape" || k === "e") { game.menu = null; return; }
+  if (k === "c") { confirmBuyResetStats(); return; }
   if (k === "w" || k === "arrowup") game.jcur = Math.max(0, (game.jcur | 0) - 1);
   else if (k === "s" || k === "arrowdown") game.jcur = Math.min(items.length - 1, (game.jcur | 0) + 1);
   else if (k === "enter" || k === "v") askSell(e, 1);
@@ -119,7 +140,7 @@ function drawJunk() {
   if (items.length > vis) txt(`${game.jcur + 1}/${items.length}`, lx + lw, ly - 6, 10, "#a9a58f", "right");
   // detalhe do item escolhido
   const e = items[game.jcur], px = 540, pw = 380;
-  ctx.fillStyle = "rgba(0,0,0,0.3)"; rr(px - 10, 92, pw + 20, 420, 8); ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.3)"; rr(px - 10, 92, pw + 20, 458, 8); ctx.fill();
   if (e) {
     if (e.kind === "weapon") drawWeaponSide(WDEF[e.it.id], px + pw / 2, 160, 1.5);
     else if (e.kind === "mat") drawMatIcon(e.it.id, px + pw / 2, 160, 1.5);
@@ -140,7 +161,21 @@ function drawJunk() {
       txt("As peças vão para a mochila (ou para o baú, se não couber).", px, by + 74, 11, "#a9a58f", "left", false, pw);
     }
   } else txt("Nada selecionado", px + pw / 2, 280, 14, "#6d6a58", "center");
-  hint("W/S escolhe · Enter vende 1 · T vende tudo · D desmonta arma · clique 2x vende · E ou Esc fecha");
+
+  // Cartão de reset no espaço inferior do Ferro Velho, abaixo dos comandos
+  // de vender/desmontar, sem cobrir detalhes de armas ou outros itens.
+  ctx.fillStyle = "rgba(45,35,15,0.96)"; rr(532, 444, 394, 101, 7); ctx.fill();
+  ctx.strokeStyle = "#d4af37"; ctx.lineWidth = 1.5; ctx.stroke();
+  txt("★ CARTÃO RESET DE STATS", 547, 468, 16, "#ffdf70", "left", true);
+  txt("Recupere seus pontos de atributo · uso único", 547, 488, 11, "#d8d2ba");
+  // Miniatura original no canto superior direito do cartão, como solicitado.
+  if (RESET_CARD_ART.complete && RESET_CARD_ART.naturalWidth) {
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(RESET_CARD_ART, 815, 446, 100, 47);
+  }
+  btn(547, 496, 362, 39, "COMPRAR · $" + RESET_STATS_PRICE.toLocaleString("pt-BR") + " (C)", confirmBuyResetStats, true);
+
+  hint("C compra cartão de reset · W/S escolhe · Enter vende · T vende tudo · D desmonta · Esc fecha");
   // confirmação para itens raros
   if (game.jconfirm) {
     const c = game.jconfirm;

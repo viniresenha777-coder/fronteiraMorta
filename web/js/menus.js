@@ -7,10 +7,13 @@
 // ---------- Teclas dentro dos menus ----------
 function menuKey(k) {
   if (game.input) { inputKey(k); return; }
-  if (game.menu === "admin") { adminKey(k); return; }
+  if (game.menu === "admin") { if (!canUseAdmin()) { game.menu = null; game.input = null; return; } adminKey(k); return; }
   if (game.menu === "name") { nameKey(k); return; }
+  if (game.menu === "friends") { friendsKey(k); return; }
+  if (game.menu === "messages") { messagesKey(k); return; }
   if (game.menu === "prof") { profKey(k); return; }
   if (game.menu === "junk") { junkKey(k); return; }
+  if (game.menu === "creditshop") { creditShopKey(k); return; }
   if (k === "escape" || k === "e" || k === "b" || (k === "c" && game.menu === "stats") || (k === "m" && game.menu === "sector") || (k === "n" && game.menu === "map") || (k === "o" && game.menu === "obj")) { game.menu = null; return; }
   if (game.menu === "bank") {
     if (k === "d") game.input = { mode: "deposit", text: "" };
@@ -33,16 +36,22 @@ function inputKey(k) {
   const inp = game.input;
   if (k === "escape") { game.input = null; return; }
   if (k === "enter") {
-    const a = parseInt(inp.text || "0", 10);
+    const rawText = inp.text || "";
+    const a = parseInt(rawText || "0", 10);
     game.input = null;
-    if (inp.mode === "adm") { if (inp.text !== "") inp.fn(a); }
+    if (inp.mode === "admText") { if (canUseAdmin() && rawText.trim()) inp.fn(rawText.trim()); }
+    else if (inp.mode === "adm") { if (canUseAdmin() && rawText !== "") inp.fn(a); }
     else if (inp.mode === "deposit") deposit(a);
     else if (inp.mode === "credits") buyCredits(a);
     else withdraw(a);
     return;
   }
   if (k === "backspace") { inp.text = inp.text.slice(0, -1); return; }
-  if (/^[0-9]$/.test(k) && inp.text.length < 9) inp.text += k;
+  if (inp.mode === "admText") {
+    const raw = game.rawKey || "";
+    if (raw.length === 1 && /[\p{L}\p{N} _.-]/u.test(raw) && inp.text.length < 40)
+      inp.text += raw;
+  } else if (/^[0-9]$/.test(k) && inp.text.length < 9) inp.text += k;
 }
 
 // ---------- Banco e VIP (loja, baú e mochila ficam em inventory.js) ----------
@@ -63,9 +72,9 @@ function buyCredits(n) {
   save.bank -= cost; save.credits += n; persist(); toast(`Comprou ${n} créditos`);
 }
 function buyGM() {
-  if (save.gm) { toast("Você já é VIP"); return; }
+  if (save.gm) { toast("Você já tem VIP legado permanente"); return; }
   if (save.credits < GM_COST) { toast(`Precisa de ${GM_COST} créditos para ativar o VIP`); return; }
-  save.credits -= GM_COST; save.gm = true; persist(); toast("VIP ativado!"); sfx.level();
+  save.credits -= GM_COST; addVipMonths(1); persist(); toast("VIP de 1 mês ativado!"); sfx.level();
 }
 
 // ---------- Atributos ----------
@@ -78,11 +87,17 @@ function statsKey(k) {
   else if (k === "d") addPoint(5);
 }
 function addPoint(n) {
-  const d = ATTRS[game.cur], weapon = !!CATNAME[d.id], pool = weapon ? "wpoints" : "points";
+  const d = ATTRS[game.cur], weapon = WEAPON_SKILL_IDS.includes(d.id), pool = weapon ? "wpoints" : "points";
   if (player[pool] <= 0) { toast(weapon ? "Sem pontos de armas" : "Sem pontos de atributo"); return; }
-  const amt = Math.min(n, player[pool], ATTR_MAX - player.attrs[d.id]);
+  const amt = Math.min(n, player[pool], weaponSkillCap(d.id) - player.attrs[d.id]);
   if (amt <= 0) { toast("Atributo no máximo"); return; }
-  player.attrs[d.id] += amt; player[pool] -= amt; syncChar();
+  const previousMaxHp = player.maxHp;
+  player.attrs[d.id] += amt; player[pool] -= amt;
+  if (d.id === "endurance") {
+    recalcImplants();
+    player.hp = Math.min(player.maxHp, player.hp + Math.max(0, player.maxHp - previousMaxHp));
+  }
+  syncChar();
 }
 
 // ---------- Missões ----------
@@ -162,20 +177,24 @@ function clinicItems() {
   return [...player.bag.map((im) => ({ src: "bag", im })), ...save.installed.map((im) => ({ src: "inst", im }))];
 }
 function clinicKey(k) {
+  if (allocOpen()) { ALLOC.im = null; return; }
   if (k === "tab") { game.tab ^= 1; game.cur = 0; return; }
   const len = game.tab === 0 ? clinicItems().length : game.stock.length;
   if (k === "w" || k === "arrowup") game.cur = Math.max(0, game.cur - 1);
   else if (k === "s" || k === "arrowdown") game.cur = Math.max(0, Math.min(len - 1, game.cur + 1));
   else if (k === "enter") clinicAct();
   else if (k === "v" && game.tab === 0) sellImplant();
-  else if (k === "f" && game.tab === 0) fuseImplant();
+  else if (k === "a" && game.tab === 0) { const it = clinicItems()[game.cur]; if (it) openAlloc(it.im); }
+  else if ((k === "q" || k === "arrowleft") && game.tab === 0) shiftImplant(-1);
+  else if ((k === "d" || k === "arrowright") && game.tab === 0) shiftImplant(1);
 }
 function clinicAct() {
   if (game.tab === 1) { buyImplant(game.cur); return; }
   const it = clinicItems()[game.cur];
   if (!it) return;
   if (it.src === "bag") {
-    if (save.installed.length >= IMPL_SLOTS) { toast("Sem espaço: remova um implante primeiro"); return; }
+    const why = installBlock(it.im);
+    if (why) { toast(why); return; }
     player.bag.splice(player.bag.indexOf(it.im), 1); save.installed.push(it.im);
     toast(`Instalou ${implantName(it.im)}`);
   } else {
@@ -186,40 +205,122 @@ function clinicAct() {
   persist(); recalcImplants();
   game.cur = Math.max(0, Math.min(game.cur, clinicItems().length - 1));
 }
+// muda a ordem dos instalados (o Mímico copia quem está à esquerda dele)
+function shiftImplant(dir) {
+  const it = clinicItems()[game.cur];
+  if (!it || it.src !== "inst") { toast("Selecione um implante instalado"); return; }
+  const a = save.installed.indexOf(it.im), b = a + dir;
+  if (b < 0 || b >= save.installed.length) return;
+  save.installed[a] = save.installed[b]; save.installed[b] = it.im;
+  game.cur = player.bag.length + b; persist(); recalcImplants();
+}
 function buyImplant(i) {
   const st = game.stock[i];
-  if (!st || st.sold) return;
+  if (!st) return;
   if (player.bag.length >= BAG_MAX) { toast("Mochila de implantes cheia"); return; }
-  if (game.money < st.price) { toast("Dinheiro insuficiente"); return; }
-  game.money -= st.price; st.sold = true; sfx.buy();
-  player.bag.push({ id: st.id, tier: 1, neg: null });
-  toast(`Comprou ${implantName({ id: st.id, tier: 1, neg: null })}`);
+  if (save.credits < st.price) { toast(`Precisa de ${st.price} créditos (compre no banco)`); return; }
+  save.credits -= st.price; sfx.buy();
+  const im = newImplant(st.id);
+  player.bag.push(im); persist();
+  toast(`Comprou ${implantName(im)}`);
 }
 function sellImplant() {
   const it = clinicItems()[game.cur];
   if (!it || it.src !== "bag") { toast("Só dá para vender implantes da mochila"); return; }
-  const v = IMP[it.im.id].combo ? 1500 : SELL[it.im.tier - 1];
+  const v = IMP[it.im.id].scrap;
   player.bag.splice(player.bag.indexOf(it.im), 1); game.money += v;
   toast(`Vendeu ${implantName(it.im)} por $${v}`);
   game.cur = Math.max(0, Math.min(game.cur, clinicItems().length - 1));
 }
-function fuseImplant() {
-  const it = clinicItems()[game.cur];
-  if (!it || it.src !== "bag") { toast("Selecione um implante da mochila"); return; }
-  const im = it.im;
-  if (IMP[im.id].combo) { toast("Implantes combo não podem ser fundidos"); return; }
-  if (im.tier >= 3) { toast("Já está no nível máximo"); return; }
-  const same = player.bag.filter((x) => x.id === im.id && x.tier === im.tier);
-  if (same.length < 3) { toast("Precisa de 3 iguais (mesmo implante e nível)"); return; }
-  const fee = im.tier === 1 ? 120 : 400;
-  if (game.money < fee) { toast(`A fusão custa $${fee}`); return; }
-  game.money -= fee;
-  for (const x of same.slice(0, 3)) player.bag.splice(player.bag.indexOf(x), 1);
-  const tier = im.tier + 1, bad = Math.random() < (tier === 2 ? 0.25 : 0.4);
-  const made = { id: im.id, tier, neg: bad ? randomNeg(tier) : null };
-  player.bag.push(made);
-  toast(bad ? `Fusão deu ${implantName(made)} (saiu com erro!)` : `Fusão deu ${implantName(made)}`);
-  game.cur = Math.max(0, Math.min(game.cur, clinicItems().length - 1));
+
+
+// Loja do refúgio: 29 implantes novos (preço individual em créditos) e
+// Trindade consumível (dinheiro do jogo, não é implante).
+const TRINDADE_PRICE = 20000000;
+function creditShopItem() {
+  const i = Math.max(0, Math.min(IMP_IDS.length, game.creditCur | 0));
+  return i === 0 ? "trindade_eterna" : IMP_IDS[i - 1];
+}
+function buyTrindade() {
+  if (!inSafe()) { toast("Compre a Trindade na base."); return; }
+  if (game.money < TRINDADE_PRICE) { toast("É preciso $20.000.000."); return; }
+  if (!addMat("trindade_eterna", 1)) { toast("Mochila cheia."); return; }
+  game.money -= TRINDADE_PRICE;
+  sfx.buy(); checkpoint("compra de Trindade");
+  toast("Trindade adquirida! Arraste-a sobre o personagem para consumir.");
+}
+function buyCreditImplant(id) {
+  const d = IMP[id];
+  if (!d || !inSafe()) { toast("Implante indisponível."); return; }
+  if (player.bag.length >= BAG_MAX) { toast("Mochila de implantes cheia."); return; }
+  if (player.bag.some(im => im.id === id) || save.installed.some(im => im.id === id)) { toast("Você já possui este implante."); return; }
+  if (save.credits < d.price) { toast("Créditos insuficientes. Necessário: " + d.price); return; }
+  save.credits -= d.price;
+  player.bag.push(newImplant(id));
+  sfx.buy(); checkpoint("compra de implante");
+  toast("Comprou " + d.name + " por " + d.price + " créditos.");
+}
+function creditShopBuy(id) {
+  if (id === "trindade_eterna") buyTrindade();
+  else if (IMP[id]) buyCreditImplant(id);
+}
+function creditShopKey(k) {
+  if (game.creditConfirm) {
+    if (k === "escape" || k === "n") game.creditConfirm = null;
+    else if (k === "enter" || k === "s" || k === "y") {
+      const chosen = game.creditConfirm; game.creditConfirm = null;
+      creditShopBuy(chosen);
+    }
+    return;
+  }
+  if (k === "escape" || k === "e" || k === "b") { game.menu = null; return; }
+  if (k === "w" || k === "arrowup") game.creditCur = Math.max(0, (game.creditCur | 0) - 1);
+  else if (k === "s" || k === "arrowdown") game.creditCur = Math.min(IMP_IDS.length, (game.creditCur | 0) + 1);
+  else if (k === "enter") game.creditConfirm = creditShopItem();
+}
+function drawCreditShop() {
+  game.creditCur = Math.max(0, Math.min(IMP_IDS.length, game.creditCur | 0));
+  menuFrame("Loja de Créditos", "Créditos: " + save.credits.toLocaleString("pt-BR") + " · Dinheiro: $" + game.money.toLocaleString("pt-BR") + " · 29 implantes disponíveis");
+  const visible = 11, top = Math.max(0, Math.min(IMP_IDS.length + 1 - visible, game.creditCur - 5));
+  for (let j = 0; j < visible && j + top <= IMP_IDS.length; j++) {
+    const i = top + j, special = i === 0, id = special ? "trindade_eterna" : IMP_IDS[i - 1], y = 96 + j * 37;
+    const d = special ? null : IMP[id];
+    const owned = !special && (player.bag.some(im => im.id === id) || save.installed.some(im => im.id === id));
+    rowBox(36, y, 514, 34, game.creditCur === i, special ? "#aa8933" : d.event ? "#8c476d" : owned ? "#47774d" : "#454338");
+    if (special) drawMatIcon("trindade_eterna", 58, y + 17, 0.42);
+    else drawEntryIcon({ type:"implant", im:{id, alloc:{}} }, 58, y + 17, 0.40);
+    txt(special ? "★ Trindade · 100 anos (item)" : d.name, 82, y + 22, 13, game.creditCur === i ? "#ffd96a" : "#e5e0c8", "left", true, 306);
+    txt(special ? "$20.000.000" : owned ? "POSSUI" : d.price.toLocaleString("pt-BR") + " cr", 532, y + 22, 12, special ? "#ffcb72" : owned ? "#7ed39d" : "#d4af37", "right", true);
+    regClick(36, y, 514, 34, () => { if (game.creditCur === i) game.creditConfirm = id; else game.creditCur = i; });
+  }
+  const id = creditShopItem(), special = id === "trindade_eterna";
+  if (special) {
+    txt("Trindade · consumível", 578, 114, 20, "#ffd96a", "left", true, 348);
+    drawMatIcon(id, 753, 215, 2.1);
+    txtWrap("Dura 100 anos após o uso. +35% de dano, +35% de velocidade de corrida e +35% de proteção proporcional aos atributos. Não ocupa espaço de implante.", 574, 300, 13, "#c9c4ad", 344, 19, 8);
+    if (trindadeActive()) txt("Ativa até " + new Date(save.trindadeUntil).toLocaleDateString("pt-BR"), 578, 418, 12, "#8fd08a");
+  } else {
+    const d = IMP[id], im = { id, alloc: {} };
+    txt(d.name, 574, 114, 20, "#ffd96a", "left", true, 348);
+    drawEntryIcon({ type: "implant", im }, 754, 201, 1.8);
+    txtWrap(implantDesc(im), 574, 290, 13, "#c9c4ad", 344, 18, 9);
+    if (d.event) txt("★ Edição de evento", 574, 425, 12, "#e7a2d2");
+  }
+  const price = special ? "$20.000.000" : IMP[id].price.toLocaleString("pt-BR") + " créditos";
+  btn(608, 457, 270, 38, "Comprar · " + price, () => { game.creditConfirm = id; }, true);
+  hint("W/S seleciona · Enter confirma · Esc fecha");
+  if (game.creditConfirm) {
+    const cid = game.creditConfirm, sp = cid === "trindade_eterna", cd = sp ? null : IMP[cid];
+    ctx.fillStyle = "rgba(0,0,0,0.82)"; ctx.fillRect(0, 0, W, H);
+    regClick(0, 0, W, H, () => {});
+    ctx.fillStyle = "#27231b"; rr(226, 188, 508, 195, 9); ctx.fill();
+    ctx.strokeStyle = "#d4af37"; ctx.lineWidth = 2; ctx.stroke();
+    txt("CONFIRMAR COMPRA", W / 2, 228, 20, "#f2eedc", "center", true);
+    txt(sp ? "Trindade · $20.000.000" : cd.name + " · " + cd.price + " créditos", W / 2, 272, 15, "#e3c46a", "center", true, 480);
+    btn(276, 315, 184, 40, "Confirmar", () => { game.creditConfirm = null; creditShopBuy(cid); }, true);
+    btn(506, 315, 184, 40, "Cancelar", () => { game.creditConfirm = null; });
+  }
+  menuToast();
 }
 
 // ---------- Viagem ----------
@@ -230,19 +331,45 @@ function travelKey(k) {
 }
 
 // ---------- Painel de administrador (F2) ----------
-const adm = { god: localPlayer.owner, infAmmo: false, noReq: false, noHunger: false, infStamina: false, freeze: false, dmg: 1, tier: 3, direct: false, shopAnywhere: false };
-const ADM_TABS = ["Geral", "Personagem", "Dinheiro e itens", "Armas", "Implantes"];
+const adm = { god: false, infAmmo: false, noReq: false, noHunger: false, infStamina: false, freeze: false, dmg: 1, direct: false, shopAnywhere: false };
+const ADM_TABS = ["Geral", "Personagem", "Dinheiro e itens", "Armas", "Implantes", "Presentes"];
+function canUseAdmin() {
+  return typeof fmCloud !== "undefined" && fmCloud.isActive() && fmCloud.isAdmin();
+}
 function toggleAdmin() {
-  if (!localPlayer.owner) return;
+  if (!canUseAdmin()) {
+    if (game.menu === "admin") { game.menu = null; game.input = null; }
+    return; // Para jogadores comuns, F2 não faz nada e não mostra qualquer aviso.
+  }
   if (game.menu === "admin") { game.menu = null; game.input = null; return; }
   if (game.over) return;
   game.shop = false; game.input = null; game.menu = "admin";
   game.at = game.at || 0; game.ac = game.ac || 0;
+  game.admGift = game.admGift || { name: "", type: "dinheiro", qty: 1000, itemIndex: 0, busy: false };
 }
-function admAsk(label, fn) { game.input = { mode: "adm", text: "", label, fn }; }
+function admAsk(label, fn) { if (!canUseAdmin()) return; game.input = { mode: "adm", text: "", label, fn }; }
+function admAskText(label, fn) { if (!canUseAdmin()) return; game.input = { mode: "admText", text: "", label, fn }; }
+const ADM_GIFT_TYPES = ["dinheiro", "vip", "arma", "material"];
+const ADM_GIFT_MATERIALS = ["sucata", "pecas", "eletronicos", "nucleo", "placa"];
+function admGiftOptions(g) {
+  return g.type === "arma" ? WLIST.filter(w => !w.fists).map(w => w.id) : ADM_GIFT_MATERIALS;
+}
+async function admSendGift() {
+  if (!canUseAdmin()) return;
+  const g = game.admGift;
+  if (!g || g.busy) return;
+  if (!g.name || g.name.trim().length < 3) { toast("Informe o nome do destinatário."); return; }
+  g.busy = true;
+  try {
+    const options = admGiftOptions(g), item = options[Math.abs(g.itemIndex || 0) % options.length];
+    toast(await fmGifts.send(g.name, g.type, g.qty, item));
+  } catch (err) {
+    toast(err.message || "Não foi possível enviar.");
+  } finally { g.busy = false; }
+}
 function admSetLevel(n) {
   n = Math.max(1, Math.min(MAX_LEVEL, n));
-  for (let l = player.level + 1; l <= n; l++) { const pts = l <= 50 ? 5 : 2; player.points += pts; player.wpoints += pts; }
+  for (let l = player.level + 1; l <= n; l++) { player.points += survivalPointsForLevel(l); player.wpoints += weaponPointsForLevel(l); }
   player.level = n; player.xp = 0; recalcImplants(); syncChar();
 }
 function admGiveWeapon(id) {
@@ -250,18 +377,19 @@ function admGiveWeapon(id) {
   toast(r ? `${WDEF[id].name} ${r === "slot" ? "equipada" : "na mochila"}` : "Mochila cheia");
 }
 function admGiveImplant(id) {
-  const im = { id, tier: IMP[id].combo ? 1 : adm.tier, neg: null };
-  if (adm.direct && save.installed.length < IMPL_SLOTS) { save.installed.push(im); persist(); recalcImplants(); toast(`Instalado: ${implantName(im)}`); }
+  const im = newImplant(id);
+  if (adm.direct && !installBlock(im)) { save.installed.push(im); persist(); recalcImplants(); toast(`Instalado: ${implantName(im)}`); }
   else if (player.bag.length < BAG_MAX) { player.bag.push(im); toast(`Na mochila: ${implantName(im)}`); }
   else toast("Mochila de implantes cheia");
 }
 function admReset() {
   save.bank = 0; save.vault = []; save.installed = []; save.credits = 0; save.gm = false; save.missions = [];
-  save.vest = -1; save.vestsOwned = VESTS.map(() => false); save.outposts = OUTPOSTS.map((o, i) => i === 0);
+  save.vestUpgrades = {}; save.vestDur = {}; save.vest = -1; save.vestsOwned = VESTS.map(() => false); save.outposts = OUTPOSTS.map((o, i) => i === 0);
   save.char = { level: 1, xp: 0, points: 0, wpoints: 0, attrs: defaultAttrs() };
   persist(); resetGame(); toast("Progresso apagado");
 }
 function admRows() {
+  if (!canUseAdmin()) return [];
   const rows = [], tab = game.at;
   const T = (label, get, set) => rows.push({ label, on: get, val: () => (get() ? "LIGADO" : "desligado"), act: () => set(!get()) });
   const B = (label, fn) => rows.push({ label, val: () => "Enter", act: (d, how) => { if (how === "enter") fn(); } });
@@ -275,7 +403,7 @@ function admRows() {
     T("Munição infinita", () => adm.infAmmo, (v) => { adm.infAmmo = v; });
     T("Ignorar requisitos de armas", () => adm.noReq, (v) => { adm.noReq = v; });
     T("Zumbis congelados", () => adm.freeze, (v) => { adm.freeze = v; });
-    T("Loja em qualquer lugar", () => adm.shopAnywhere, (v) => { adm.shopAnywhere = v; });
+    // Loja fica somente como imagem decorativa.
     rows.push({ label: "Multiplicador de dano", val: () => "x" + adm.dmg, act: (d) => { const o = [1, 2, 5, 10, 100, 1000], i = o.indexOf(adm.dmg); adm.dmg = o[(i + (d || 1) + o.length) % o.length]; } });
     N("Hora do dia (0 a 23)", () => Math.floor(game.clock / 60) % 24, (v) => { game.clock = Math.floor(game.clock / 1440) * 1440 + v * 60; }, 1, 0, 23);
     rows.push({ label: `Ir para área de perigo (0 a ${MAX_ZONE})`, val: () => `agora: zona ${game.area}`, act: (d, how) => { if (how === "enter") admAsk("Ir para qual zona?", (v) => teleportZone(v)); } });
@@ -293,9 +421,9 @@ function admRows() {
     B("Subir 10 níveis", () => admSetLevel(player.level + 10));
     N("Pontos de atributo livres", () => player.points, (v) => { player.points = v; syncChar(); }, 5, 0, 99999);
     N("Pontos de armas livres", () => player.wpoints, (v) => { player.wpoints = v; syncChar(); }, 5, 0, 99999);
-    B("Todos os atributos no máximo (200)", () => { ATTRS.forEach((d) => { player.attrs[d.id] = ATTR_MAX; }); syncChar(); toast("Atributos no máximo"); });
-    B("Voltar atributos ao valor inicial", () => { ATTRS.forEach((d) => { player.attrs[d.id] = d.start; }); syncChar(); toast("Atributos reiniciados"); });
-    ATTRS.forEach((d) => N(d.name + (CATNAME[d.id] ? " (arma)" : ""), () => player.attrs[d.id], (v) => { player.attrs[d.id] = v; syncChar(); }, 5, 1, ATTR_MAX));
+    B("Atributos no máximo (Stats 100 · Proficiências 120)", () => { ATTRS.forEach((d) => { player.attrs[d.id] = weaponSkillCap(d.id); }); recalcImplants(); syncChar(); toast("Atributos nos limites permitidos"); });
+    B("Voltar atributos ao valor inicial", () => { ATTRS.forEach((d) => { player.attrs[d.id] = d.start; }); recalcImplants(); syncChar(); toast("Atributos reiniciados"); });
+    ATTRS.forEach((d) => N(d.name + (CATNAME[d.id] ? " (arma)" : ""), () => player.attrs[d.id], (v) => { player.attrs[d.id] = v; if (d.id === "endurance") recalcImplants(); syncChar(); }, 5, d.start, weaponSkillCap(d.id)));
   } else if (tab === 2) {
     N("Dinheiro na mochila", () => game.money, (v) => { game.money = v; }, 1000, 0, 999999999);
     N("Dinheiro no banco", () => save.bank, (v) => { save.bank = v; persist(); }, 10000, 0, 999999999);
@@ -316,16 +444,39 @@ function admRows() {
       if (d.fists) return;
       rows.push({ label: `${d.name} · ${CAT_LABEL[d.cat]}${d.legendary ? " (lendária)" : d.special ? " (especial)" : ""}`, val: () => "dar", act: (x, how) => { if (how === "enter") admGiveWeapon(d.id); } });
     });
-  } else {
-    rows.push({ label: "Nível dos implantes a dar", val: () => "T" + adm.tier, act: (d) => { adm.tier = ((adm.tier - 1 + (d || 1) + 3) % 3) + 1; } });
+  } else if (tab === 4) {
     T("Instalar direto (sem passar pela clínica)", () => adm.direct, (v) => { adm.direct = v; });
-    Object.keys(IMP).forEach((id) => rows.push({ label: IMP[id].combo ? `${IMP[id].name} (combo)` : implantName({ id, tier: adm.tier, neg: null }), val: () => "dar", act: (d, how) => { if (how === "enter") admGiveImplant(id); } }));
+    IMP_IDS.forEach((id) => rows.push({ label: `${IMP[id].name} · ${IMP[id].price} créditos`, val: () => "dar", act: (d, how) => { if (how === "enter") admGiveImplant(id); } }));
     B("Limpar a mochila de implantes", () => { player.bag.length = 0; toast("Mochila de implantes vazia"); });
     B("Remover os implantes instalados", () => { save.installed.length = 0; persist(); recalcImplants(); toast("Implantes removidos"); });
+  } else if (tab === 5) {
+    const g = game.admGift || (game.admGift = { name: "", type: "dinheiro", qty: 1000, itemIndex: 0, busy: false });
+    B("Destinatário: " + (g.name || "(digitar nome in-game)"), () => admAskText("Nome do jogador", name => { g.name = name.slice(0,16); }));
+    rows.push({ label: "Tipo de presente (A/D para escolher)", val: () =>
+      ({dinheiro:"Dinheiro",vip:"VIP temporário",arma:"Arma",material:"Material"})[g.type],
+      act: (d) => { g.type = ADM_GIFT_TYPES[(ADM_GIFT_TYPES.indexOf(g.type) + (d < 0 ? -1 : 1) + ADM_GIFT_TYPES.length) % ADM_GIFT_TYPES.length]; g.itemIndex = 0; g.qty = g.type === "vip" ? 1 : g.type === "arma" ? 1 : g.type === "material" ? 10 : 1000; } });
+    if (g.type === "vip") {
+      rows.push({ label: "Duração do VIP (A/D para escolher)", val: () =>
+        g.qty === 1 ? "1 mês" : g.qty === 6 ? "6 meses" : "1 ano",
+        act: (d) => { const o = [1,6,12]; g.qty = o[(o.indexOf([1,6,12].includes(g.qty)?g.qty:1)+(d<0?-1:1)+o.length)%o.length]; } });
+    } else if (g.type === "dinheiro" || g.type === "material") {
+      N("Quantidade", () => g.qty, n => { g.qty = n; }, 100, 1, g.type === "material" ? 1000 : 10000000);
+    }
+    if (g.type === "arma" || g.type === "material") {
+      rows.push({label: "Item (A/D alterna)", val: () => {
+        const list = admGiftOptions(g), item = list[(g.itemIndex || 0) % list.length];
+        return g.type === "arma" ? WDEF[item].name : MATS[item].name;
+      }, act: (d) => { const list = admGiftOptions(g);
+        g.itemIndex = ((g.itemIndex || 0) + (d < 0 ? -1 : 1) + list.length) % list.length; }});
+    }
+    B("ENVIAR PRESENTE PARA O JOGADOR", () => admSendGift());
+    rows.push({ label: "A entrega é automática e aparece em Mensagens (I).",
+      val: () => g.busy ? "enviando..." : "somente ADM", act: () => {} });
   }
   return rows;
 }
 function adminKey(k) {
+  if (!canUseAdmin()) { game.menu = null; game.input = null; return; }
   if (k === "escape" || k === "f2") { game.menu = null; return; }
   if (k === "tab") { game.at = (game.at + 1) % ADM_TABS.length; game.ac = 0; return; }
   const rows = admRows();
@@ -365,10 +516,13 @@ function drawMenu() {
   else if (game.menu === "missions") drawMissions();
   else if (game.menu === "sector") drawSector();
   else if (game.menu === "junk") drawJunk();
+  else if (game.menu === "creditshop") drawCreditShop();
   else if (game.menu === "admin") drawAdmin();
   else if (game.menu === "travel") drawTravel();
   else if (game.menu === "map") drawMap();
-  else if (game.menu === "pack") drawPack();
+  else if (game.menu === "friends") drawFriends();
+  else if (game.menu === "messages") drawMessages();
+  else if (game.menu === "pack") drawInventory();
   else if (game.menu === "craft") drawCraft();
   else if (game.menu === "obj") drawObjectives();
   else drawStash();
@@ -376,16 +530,16 @@ function drawMenu() {
 }
 
 function drawBank() {
-  menuFrame("Banco", `Mochila: $${game.money}  ·  Banco: $${save.bank}  ·  Créditos: ${save.credits}  ·  VIP: ${save.gm ? "ativo" : "inativo"}`);
+  menuFrame("Banco", `Mochila: $${game.money}  ·  Banco: $${save.bank}  ·  Créditos: ${save.credits}  ·  VIP: ${vipStatus()}`);
   txt("O dinheiro do banco não se perde quando você morre. Só dá para usar o banco dentro de um posto.", W / 2, 100, 13, "#a9a58f", "center");
   const rows = [["D", "Depositar (digitar valor)"], ["A", "Depositar tudo"], ["S", "Sacar (digitar valor)"], ["T", "Sacar tudo"],
-                ["C", `Comprar créditos ($${CREDIT_PRICE} cada)`], ["G", `Ativar VIP (${GM_COST} créditos)`]];
+                ["C", `Comprar créditos ($${CREDIT_PRICE} cada)`], ["G", `Ativar VIP por 1 mês (${GM_COST} créditos)`]];
   rows.forEach(([key, label], i) => {
     const x = i % 2 === 0 ? 100 : 500, y = 124 + Math.floor(i / 2) * 60;
     rowBox(x, y, 360, 50, false, i >= 4 ? "#d4af37" : null);
     txt(`${key}  ${label}`, x + 16, y + 31, 16, "#e5e0c8", "left", true);
   });
-  txt(`VIP (${GM_COST} créditos = $${CREDIT_PRICE * GM_COST}, pagos com o saldo do banco) — benefícios permanentes:`, W / 2, 332, 15, "#d4af37", "center", true);
+  txt(`VIP (${GM_COST} créditos = $${CREDIT_PRICE * GM_COST}, pagos com o saldo do banco) — benefícios durante o VIP:`, W / 2, 332, 15, "#d4af37", "center", true);
   txt("+100% de chance de corpos para saquear · +100% de XP · +60% de saque nos lugares vasculháveis", W / 2, 360, 14, "#a9a58f", "center");
   txt("+100% de munição · +100% de dinheiro · armas lendárias podem aparecer nos saques (teclas 9 e 0)", W / 2, 382, 14, "#a9a58f", "center");
   hint("E, B ou Esc fecha");
@@ -408,7 +562,7 @@ function drawStats() {
     regClick(50 + i * 120, 24, 110, 24, () => { game.stab = i; game.skc = save.skin; });
   });
   if (game.stab === 1) { drawSkins(); hint("A/D escolhe · Enter usa · Tab volta aos atributos · C ou Esc fecha"); return; }
-  txt(`Pontos de atributo: ${player.points}  ·  Pontos de armas: ${player.wpoints}   ·   XP ${Math.floor(player.xp)}/${player.level >= MAX_LEVEL ? "máx" : xpNeed(player.level)}`,
+  txt(`HP ${Math.ceil(player.hp)}/${Math.ceil(player.maxHp)} (máx. 200)  ·  Pontos de atributo: ${player.points}  ·  Armas: ${player.wpoints}   ·   XP ${Math.floor(player.xp)}/${player.level >= MAX_LEVEL ? "máx" : xpNeed(player.level)}`,
     W / 2, 74, 16, player.points + player.wpoints > 0 ? "#ffd96a" : "#a9a58f", "center");
   ATTRS.forEach((d, i) => {
     const y = 90 + i * 31, sel = game.cur === i, v = player.attrs[d.id];
@@ -416,11 +570,11 @@ function drawStats() {
     txt(d.name, 76, y + 19, 15, "#e5e0c8", "left", true);
     txt(String(v), 290, y + 19, 15, "#ffd96a", "left", true);
     ctx.fillStyle = "#000"; ctx.fillRect(330, y + 11, 120, 6);
-    ctx.fillStyle = CATNAME[d.id] ? "#d08a5a" : "#6d8aa8"; ctx.fillRect(330, y + 11, 120 * (v / ATTR_MAX), 6);
-    txt(CATNAME[d.id] ? "arma" : "atributo", 460, y + 19, 11, CATNAME[d.id] ? "#d08a5a" : "#6d8aa8");
+    ctx.fillStyle = WEAPON_SKILL_IDS.includes(d.id) ? "#d08a5a" : "#6d8aa8"; ctx.fillRect(330, y + 11, 120 * Math.min(1, v / weaponSkillCap(d.id)), 6);
+    txt(WEAPON_SKILL_IDS.includes(d.id) ? `arma · máx. ${weaponSkillCap(d.id)}` : "stats · máx. 100", 460, y + 19, 11, WEAPON_SKILL_IDS.includes(d.id) ? "#d08a5a" : "#6d8aa8");
     txt(attrEffect(d.id, v), 884, y + 19, 12, "#a9a58f", "right");
   });
-  hint("W/S escolhe · Enter +1 · D +5 · pontos de arma só nas 5 proficiências · Tab: personagem · C ou Esc fecha");
+  hint("W/S escolhe · Enter +1 · D +5 · pontos de arma: Força + 5 proficiências · Tab: personagem · C ou Esc");
 }
 
 function drawMissionRow(x, y, w, m, sel, active) {
@@ -442,30 +596,48 @@ function drawMissions() {
   hint("W/S move · Enter aceita/entrega · V abandona · M ou E fecha");
 }
 
-function drawImplantRow(x, y, w, im, selected) {
-  rowBox(x, y, w, 36, selected);
-  txt(implantName(im), x + 10, y + 15, 14, im.neg ? "#e07b5a" : IMP[im.id].combo ? "#c58bff" : TIER_COLOR[im.tier - 1], "left", true, w - 20);
-  txt(implantDesc(im), x + 10, y + 29, 11, "#a9a58f", "left", false, w - 20);
+function drawImplantRow(x, y, w, im, selected, right, rightColor) {
+  rowBox(x, y, w, 28, selected);
+  txt(implantName(im), x + 10, y + 19, 14, impColor(im), "left", true, w - (right ? 170 : 20));
+  if (right) txt(right, x + w - 10, y + 19, 13, rightColor || "#a9a58f", "right", true);
+}
+// caixa com o nome e a descrição inteira do implante selecionado
+function drawImplantInfo(im) {
+  ctx.fillStyle = "rgba(0,0,0,0.35)"; rr(40, 424, W - 80, 118, 8); ctx.fill();
+  if (!im) { txt("Selecione um implante para ver os efeitos", W / 2, 488, 14, "#6d6a58", "center"); return; }
+  txt(implantName(im), 56, 448, 17, impColor(im), "left", true);
+  txt(`Único (só um instalado) · sucata $${IMP[im.id].scrap}`, W - 56, 448, 12, "#a9a58f", "right");
+  txtWrap(implantDesc(im), 56, 470, 13, "#d8d2ba", W - 112, 17, 4);
 }
 function drawClinic() {
-  menuFrame("Clínica de implantes", `Dinheiro: $${game.money}  ·  Instalados: ${save.installed.length}/${IMPL_SLOTS}  ·  Mochila: ${player.bag.length}/${BAG_MAX}`);
+  menuFrame("Clínica de implantes", `Créditos: ${save.credits}  ·  Dinheiro: $${game.money}  ·  Instalados: ${save.installed.length}/${IMPL_SLOTS}  ·  Mochila: ${player.bag.length}/${BAG_MAX}`);
   txt("Meus implantes", W / 2 - 100, 100, 16, game.tab === 0 ? "#ffd96a" : "#6d6a58", "center", true);
   txt("Loja", W / 2 + 100, 100, 16, game.tab === 1 ? "#ffd96a" : "#6d6a58", "center", true);
   if (game.tab === 0) {
-    txt("Na mochila (somem se você morrer)", 40, 126, 13, "#a9a58f");
-    txt("Instalados (permanentes)", 500, 126, 13, "#a9a58f");
-    player.bag.forEach((im, i) => drawImplantRow(40, 134 + i * 40, 440, im, game.cur === i));
-    save.installed.forEach((im, j) => drawImplantRow(500, 134 + j * 40, 420, im, game.cur === player.bag.length + j));
-    if (!player.bag.length && !save.installed.length) txt("Nenhum implante ainda. Ache em saques ou compre na loja (Tab).", 40, 160, 15, "#6d6a58");
-    hint("W/S move · Enter instala/remove · V vende · F funde 3 iguais ($120 T1→T2, $400 T2→T3) · Tab loja · E fecha");
+    txt("Na mochila (preservados ao morrer)", 40, 126, 13, "#a9a58f");
+    txt("Instalados, na ordem dos slots (permanentes)", 500, 126, 13, "#a9a58f");
+    const pts = (im) => (IMP[im.id].alloc ? `${allocUsed(im)}/${IMP[im.id].alloc.points} pts` : IMP[im.id].mimic ? "copia ←" : "");
+    player.bag.forEach((im, i) => drawImplantRow(40, 134 + i * 32, 440, im, game.cur === i, pts(im)));
+    save.installed.forEach((im, j) => drawImplantRow(500, 134 + j * 32, 420, im, game.cur === player.bag.length + j, `${j + 1}º  ${pts(im)}`));
+    if (!player.bag.length && !save.installed.length) txt("Nenhum implante ainda. Compre na loja (Tab) ou ache em saques raros.", 40, 160, 15, "#6d6a58");
+    const it = clinicItems()[game.cur];
+    drawImplantInfo(it ? it.im : null);
+    hint("W/S move · Enter instala/remove · A distribui pontos · Q/D muda a ordem · V vende · Tab loja · E fecha");
   } else {
-    game.stock.forEach((st, i) => {
-      const x = 140, y = 130 + i * 52, im = { id: st.id, tier: 1, neg: null };
-      drawImplantRow(x, y, 680, im, game.cur === i);
-      txt(st.sold ? "vendido" : `$${st.price}`, x + 664, y + 22, 15, st.sold ? "#6d6a58" : game.money >= st.price ? "#6fae4f" : "#c0392b", "right", true);
-    });
-    hint("Estoque de implantes T1 (muda a cada vida) · W/S move · Enter compra · Tab volta · E fecha");
+    const N = 9, first = Math.max(0, Math.min(game.stock.length - N, game.cur - 4));
+    for (let r = 0; r < N && first + r < game.stock.length; r++) {
+      const i = first + r, st = game.stock[i], im = { id: st.id, alloc: {} };
+      const has = save.installed.some((x) => x.id === st.id) ? "instalado · " : player.bag.some((x) => x.id === st.id) ? "na mochila · " : "";
+      drawImplantRow(140, 126 + r * 32, 680, im, game.cur === i, `${has}${st.price} créditos`, save.credits >= st.price ? "#6fae4f" : "#c0392b");
+    }
+    txt(`${game.cur + 1} / ${game.stock.length}`, 830, 144, 12, "#a9a58f");
+    if (first > 0) txt("▲", 830, 164, 12, "#ffd96a");
+    if (first + N < game.stock.length) txt("▼", 830, 400, 12, "#ffd96a");
+    const st = game.stock[game.cur];
+    drawImplantInfo(st ? { id: st.id, alloc: {} } : null);
+    hint("Implantes únicos, pagos com créditos (compre créditos no banco) · W/S move · Enter compra · Tab volta · E fecha");
   }
+  drawAllocPanel();
 }
 
 function drawTravel() {
@@ -493,7 +665,7 @@ function tierTextColor(t) { return REGIONS[t].color === "#2a2a2e" ? "#9a9aa0" : 
 function drawMap() {
   const here = world.cell;
   if (!game.mapSel) game.mapSel = { cx: here.cx, cy: here.cy };
-  menuFrame("Mapa da cidade", `${allCells().length} áreas · oeste tranquilo, leste mortal · ☠ = chefe vivo (${bossCells().length})`);
+  menuFrame("Mapa da cidade", `${allCells().length} áreas · ${fmSocial.online().length + 1} jogador(es) online · ☠ = chefe vivo (${bossCells().length})`);
   const cs = 34, gx = 34, gy = 96, now = performance.now();
   for (let cy = 0; cy < MAP_H; cy++) for (let cx = 0; cx < MAP_W; cx++) {
     const c = cellAt(cx, cy), x = gx + cx * cs, y = gy + cy * cs;
@@ -513,6 +685,20 @@ function drawMap() {
     if (game.mapSel.cx === cx && game.mapSel.cy === cy) { ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]); ctx.strokeRect(x + 4, y + 4, cs - 8, cs - 8); ctx.setLineDash([]); }
     regClick(x, y, cs, cs, () => { game.mapSel = { cx, cy }; });
   }
+  // Marcadores de sobreviventes online por setor: azul = jogador, verde = amigo.
+  const locations = new Map();
+  for (const p of fmSocial.online()) {
+    const key = p.cx + "," + p.cy;
+    if (!locations.has(key)) locations.set(key, []);
+    locations.get(key).push(p);
+  }
+  for (const [key, group] of locations) {
+    const [cx, cy] = key.split(",").map(Number);
+    const x = gx + cx * cs + cs - 9, y = gy + cy * cs + 9;
+    ctx.fillStyle = group.some(p => fmSocial.isFriend(p.uid)) ? "#8fe0a8" : "#73ceff";
+    circle(x, y, 9);
+    txt(String(group.length), x, y + 4, 11, "#101613", "center", true);
+  }
   for (let cx = 0; cx < MAP_W; cx++) txt(String.fromCharCode(65 + cx), gx + cx * cs + cs / 2, gy - 6, 10, "#a9a58f", "center", true);
   for (let cy = 0; cy < MAP_H; cy++) txt(String(cy + 1), gx - 8, gy + cy * cs + cs / 2 + 4, 10, "#a9a58f", "right", true);
   // legenda das cores
@@ -523,9 +709,11 @@ function drawMap() {
     ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 1; ctx.strokeRect(x, y - 10, 14, 14);
     txt(`${RG.name} · ${RG.diff}`, x + 19, y + 2, 11, "#c9c4ad", "left", true);
   });
-  txt("⌂ base  ☠ chefe  H hospital  P prisão  B bunker  amarelo = você  apagado = não visitada", gx, ly + 66, 11, "#a9a58f");
+  txt("⌂ base  ☠ chefe  H hospital  P prisão  B bunker  amarelo = você  azul = online  verde = amigo", gx, ly + 66, 11, "#a9a58f");
   // área escolhida
   const sel = cellAt(game.mapSel.cx, game.mapSel.cy), lx = 540;
+  const sectorOnline = fmSocial.online().filter(p => p.cx === game.mapSel.cx && p.cy === game.mapSel.cy);
+  txt("ONLINE: " + sectorOnline.length + (sectorOnline.length ? " · " + sectorOnline.map(p => p.name).join(", ") : ""), lx, 87, 12, "#73ceff", "left", true, 370);
   if (!sel) {
     txt(`${cellCode(game.mapSel.cx, game.mapSel.cy)} · sem passagem`, lx, 120, 20, "#6d6a58", "left", true);
     txt("Escombros e prédios caídos fecham essa área.", lx, 144, 13, "#a9a58f");
@@ -562,10 +750,17 @@ function drawMap() {
 }
 
 function drawAdmin() {
+  if (!canUseAdmin()) { game.menu = null; game.input = null; return; }
   const rows = admRows();
   game.ac = Math.max(0, Math.min(rows.length - 1, game.ac));
   menuFrame("Painel de administrador");
-  ADM_TABS.forEach((t, i) => txt(t, 130 + i * 175, 78, 15, game.at === i ? "#ffd96a" : "#6d6a58", "center", true));
+  ADM_TABS.forEach((t, i) => {
+    const x = 36 + i * 148, w = 148;
+    ctx.fillStyle = game.at === i ? "rgba(212,175,55,0.16)" : "rgba(0,0,0,0)";
+    ctx.fillRect(x, 55, w, 34);
+    txt(t, x + w / 2, 78, 14, game.at === i ? "#ffd96a" : "#a9a58f", "center", true);
+    regClick(x, 55, w, 34, () => { game.at = i; game.ac = 0; game.input = null; });
+  });
   ctx.fillStyle = "#3d3b30"; ctx.fillRect(40, 90, 880, 1);
   const vis = 14, off = Math.max(0, Math.min(rows.length - vis, game.ac - 6));
   rows.slice(off, off + vis).forEach((r, j) => {
@@ -573,15 +768,16 @@ function drawAdmin() {
     rowBox(60, y, 840, 25, sel);
     txt(r.label, 74, y + 17, 14, "#e5e0c8", "left", false, 560);
     txt(r.val(), 886, y + 17, 14, on === true ? "#6fae4f" : "#ffd96a", "right", true);
+    regClick(60, y, 840, 25, () => { game.ac = off + j; r.act(1,"enter"); });
   });
   if (rows.length > vis) txt(`${game.ac + 1}/${rows.length} · use W/S para rolar`, W / 2, 506, 12, "#a9a58f", "center");
-  hint("W/S escolhe · Tab troca de aba · A/D ajusta · Enter ativa ou digita um valor · F2 ou Esc fecha");
+  hint("CLIQUE nas abas e opções · W/S seleciona · A/D muda valor · Enter confirma · F2/Esc fecha");
   if (game.msgT > 0) txt(game.msg, W / 2, 536, 16, "#ffd96a", "center", true);
-  if (game.input && game.input.mode === "adm") {
+  if (game.input && (game.input.mode === "adm" || game.input.mode === "admText")) {
     ctx.fillStyle = "rgba(0,0,0,0.96)"; rr(220, 200, 520, 170, 10); ctx.fill();
     ctx.strokeStyle = "#d4af37"; ctx.lineWidth = 2; ctx.stroke();
     txt(game.input.label, W / 2, 240, 20, "#e5e0c8", "center", true);
-    txt(`${game.input.text || "0"}${Math.floor(performance.now() / 500) % 2 ? "|" : ""}`, W / 2, 300, 36, "#e5e0c8", "center", true);
-    txt("digite um número · Enter confirma · Esc cancela", W / 2, 345, 14, "#a9a58f", "center");
+    txt(`${game.input.text || ""}${Math.floor(performance.now() / 500) % 2 ? "|" : ""}`, W / 2, 300, game.input.mode === "admText" ? 23 : 36, "#e5e0c8", "center", true, 490);
+    txt(game.input.mode === "admText" ? "Digite o nome no jogo · Enter confirma · Esc cancela" : "Digite um número · Enter confirma · Esc cancela", W / 2, 345, 14, "#a9a58f", "center");
   }
 }

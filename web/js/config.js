@@ -12,9 +12,10 @@ const FONT = "'Trebuchet MS', 'Segoe UI', sans-serif";
 // A cidade é uma grade de áreas separadas. Você anda para cima, para baixo e para
 // os lados; ao sair pela borda de uma área a tela escurece e carrega a vizinha.
 // Cada área tem 2 x 2 quadras com ruas em cruz no meio e ruas nas bordas.
-const AREA_EDGE = 70, BLOCK_W = 620, BLOCK_H = 640, ST_W = 140;
-const WORLD_W = 2 * AREA_EDGE + 2 * BLOCK_W + ST_W;   // 1520
-const WORLD_H = 2 * AREA_EDGE + 2 * BLOCK_H + ST_W;   // 1560
+// Ruas perimetrais mais largas (70 -> 110), sem alterar a avenida central (140).
+const AREA_EDGE = 150, BLOCK_W = 620, BLOCK_H = 640, ST_W = 140;
+const WORLD_W = 2 * AREA_EDGE + 2 * BLOCK_W + ST_W;   // 1680
+const WORLD_H = 2 * AREA_EDGE + 2 * BLOCK_H + ST_W;   // 1720
 const SIDEWALK = 26;
 const MID_X = AREA_EDGE + BLOCK_W + ST_W / 2, MID_Y = AREA_EDGE + BLOCK_H + ST_W / 2;
 // ruas: faixas [início, fim] na horizontal (y) e na vertical (x)
@@ -55,15 +56,15 @@ const OUTPOSTS = [
 ];
 // Faixas de dificuldade (cores do mapa): hp/dmg = multiplicadores dos zumbis · loot = chance de cada raridade
 const REGIONS = [
-  { name: "Azul",           diff: "Muito fácil",   desc: "para quem está começando",                color: "#4a7ad8", hp: 1,   dmg: 1,   spawn: 0.9,  loot: [75, 22, 3, 0, 0] },
-  { name: "Verde",          diff: "Fácil",         desc: "corredores e os primeiros cães",          color: "#4fae4f", hp: 1.4, dmg: 1.2, spawn: 1,    loot: [62, 29, 8, 1, 0] },
-  { name: "Amarela",        diff: "Médio",         desc: "cuspidores, contaminados e infectados",   color: "#c8c048", hp: 2,   dmg: 1.5, spawn: 1.1,  loot: [46, 33, 16, 5, 0] },
-  { name: "Laranja",        diff: "Médio+",        desc: "brutamontes · leve uma arma melhor",      color: "#e0902f", hp: 2.8, dmg: 1.9, spawn: 1.2,  loot: [30, 35, 24, 9, 2] },
-  { name: "Vermelha",       diff: "Difícil",       desc: "tóxicos e mutantes · para experientes",   color: "#d8443a", hp: 3.8, dmg: 2.3, spawn: 1.3,  loot: [18, 32, 30, 16, 4] },
-  { name: "Vermelho-escura", diff: "Difícil+",     desc: "demônios · precisa de implantes",         color: "#9a2424", hp: 4.8, dmg: 2.7, spawn: 1.35, loot: [10, 26, 34, 23, 7] },
-  { name: "Preta",          diff: "Muito difícil", desc: "abominações · implantes e coletes bons",  color: "#2a2a2e", hp: 6,   dmg: 3.2, spawn: 1.4,  loot: [5, 20, 35, 28, 12] },
-  { name: "Roxa",           diff: "Extrema",       desc: "o pior da cidade · vá preparado",         color: "#7a3ac8", hp: 7.5, dmg: 3.8, spawn: 1.5,  loot: [2, 14, 34, 34, 16] },
-  { name: "Cinza",          diff: "Zona Morta",    desc: `só a partir do nível ${GRAY_LEVEL}`,      color: "#8a8a8a", hp: 9,   dmg: 4.4, spawn: 1.55, loot: [0, 10, 30, 38, 22] }
+  { name: "Azul",           diff: "Muito fácil",   desc: "para quem está começando",                color: "#4a7ad8", hp: 1,   dmg: 0.9, spawn: 0.9,  loot: [75, 22, 3, 0, 0] },
+  { name: "Verde",          diff: "Fácil",         desc: "corredores e os primeiros cães",          color: "#4fae4f", hp: 1.4, dmg: 1,   spawn: 1,    loot: [62, 29, 8, 1, 0] },
+  { name: "Amarela",        diff: "Médio",         desc: "cuspidores, contaminados e infectados",   color: "#c8c048", hp: 2,   dmg: 1.15, spawn: 1.1,  loot: [46, 33, 16, 5, 0] },
+  { name: "Laranja",        diff: "Médio+",        desc: "brutamontes · leve uma arma melhor",      color: "#e0902f", hp: 2.8, dmg: 1.35, spawn: 1.2,  loot: [30, 35, 24, 9, 2] },
+  { name: "Vermelha",       diff: "Difícil",       desc: "tóxicos e mutantes · para experientes",   color: "#d8443a", hp: 3.8, dmg: 1.55, spawn: 1.3,  loot: [18, 32, 30, 16, 4] },
+  { name: "Vermelho-escura", diff: "Difícil+",     desc: "demônios · precisa de implantes",         color: "#9a2424", hp: 4.8, dmg: 1.75, spawn: 1.35, loot: [10, 26, 34, 23, 7] },
+  { name: "Preta",          diff: "Muito difícil", desc: "abominações · implantes e coletes bons",  color: "#2a2a2e", hp: 6,   dmg: 2,   spawn: 1.4,  loot: [5, 20, 35, 28, 12] },
+  { name: "Roxa",           diff: "Extrema",       desc: "o pior da cidade · vá preparado",         color: "#7a3ac8", hp: 7.5, dmg: 2.25, spawn: 1.5,  loot: [2, 14, 34, 34, 16] },
+  { name: "Cinza",          diff: "Zona Morta",    desc: `só a partir do nível ${GRAY_LEVEL}`,      color: "#8a8a8a", hp: 9,   dmg: 2.55, spawn: 1.55, loot: [0, 10, 30, 38, 22] }
 ];
 const REGION_ROWS = 3;                       // cada faixa de cor tem 3 níveis de zona
 const MAX_ZONE = REGIONS.length * REGION_ROWS - 1;
@@ -87,9 +88,9 @@ const VESTS = [
   { name: "Armadura de Combate Pesada",     armor: 24, price: 6000,  color: "#2f4a6a", rar: 2, slow: 8 },
   { name: "Armadura Tática do Deserto",     armor: 22, price: 9000,  color: "#a08458", rar: 2, acid: 40 },
   { name: "Armadura de Combate Urbano",     armor: 22, price: 12000, color: "#3a3a3e", rar: 2, stealth: 20 },
-  { name: "Armadura de Segurança de Elite", armor: 30, credits: 500, color: "#2a2a2c", rar: 3, hp: 40 },
+  { name: "Armadura de Segurança de Elite", armor: 30, credits: 500, color: "#2a2a2c", rar: 3, hp: 15 },
   { name: "Armadura Tática Avançada",       armor: 34, credits: 500, color: "#7a6a4a", rar: 3 },
-  { name: "Armadura de Assalto Pesada",     armor: 45, craft: true,  color: "#3a4a32", rar: 4, slow: 6, hp: 60, acid: 25 }
+  { name: "Armadura de Assalto Pesada",     armor: 45, craft: true,  color: "#3a4a32", rar: 4, slow: 6, hp: 25, acid: 25 }
 ];
 
 // ---------- Zumbis ----------
@@ -101,6 +102,7 @@ const ZTYPES = {
   // especiais
   dog:     { name: "Cão infectado", plural: "cães infectados", hp: 0.55, spd: 2.5, dmg: 0.7, r: 11, from: 3, weight: 2, xp: 1.4, pack: [2, 4], hitDelay: 1000, group: "Especial" },
   spitter: { name: "Cuspidor",    plural: "cuspidores",  hp: 0.8, spd: 0.8,  dmg: 0.7, r: 13, from: 6,  weight: 2,  xp: 1.5, ranged: true, group: "Especial" },
+  creeper: { name: "Rastejante",  plural: "rastejantes", hp: 1.2, spd: 0.6, dmg: 1.1, r: 14, from: 5, weight: 1.5, xp: 2, blastDeath: true, group: "Especial" },
   hazmat:  { name: "Contaminado", plural: "contaminados", hp: 1.4, spd: 0.85, dmg: 0.9, r: 14, from: 7, weight: 1.5, xp: 1.8, gas: true, group: "Especial" },
   infected: { name: "Infectado",  plural: "infectados",  hp: 1.1, spd: 1.35, dmg: 1.1, r: 13, from: 8, weight: 2, xp: 1.6, pack: [2, 3], dodge: true, group: "Infectado" },
   brute:   { name: "Brutamontes", plural: "brutamontes", hp: 3,   spd: 0.62, dmg: 1.9, r: 19, from: 9, weight: 2,  xp: 3, group: "Especial" },
@@ -251,83 +253,98 @@ const IMPLANT_CHANCE = { airdrop: 0.25, corpse: 0.02, boss: 1, chest: 0.06, tras
   "Cela": 0.02, "Armário de evidências": 0.04, "Caixa militar": 0.05, "Beliche": 0.03, "Estoque de suprimentos": 0.01 };
 
 // ---------- Implantes ----------
-// Tiers 1 a 3; 3 cópias iguais se fundem; a fusão pode sair com "Erro". Combos têm vários efeitos (e penalidades).
+// Novo catálogo: 29 implantes; o sistema antigo de slots, saque e clínica é preservado.
+// fx = efeitos fixos (%). alloc = pontos que o jogador distribui (arrastando o implante para o boneco).
+// flag = efeito único (não é copiado pelo Mímico). mimic = copia o implante do slot à esquerda.
 const IMPL_SLOTS = 6, BAG_MAX = 8;
+const IMPLANT_RARITY = 0.1;      // multiplica a chance de achar implante no saque (valem muito)
+const BOSS_IMPLANT = 0.15;       // chefes que davam implante garantido: agora só às vezes
 const STAT_KEYS = ["exp", "hunter", "scavenger", "crit", "reload", "endurance", "metabolism", "vigor", "regen", "silence", "firepower", "thick", "greed", "agility", "saver", "implantLoot",
-  "rage", "killHeal", "lootSense", "luck", "accImp", "stealthImp", "craftDisc", "critDmg", "leech", "adren"];
-const IMP = {
-  exp:        { name: "Experiência", vals: [5, 12, 25],      text: "+{v}% de experiência" },
-  hunter:     { name: "Caçador",     vals: [3, 6, 10],       text: "+{v}% de chance de achar armas" },
-  scavenger:  { name: "Catador",     vals: [4, 8, 14],       text: "+{v}% de chance de achar munição e suprimentos" },
-  crit:       { name: "Crítico",     vals: [3, 6, 10],       text: "+{v}% de chance de crítico (dano em dobro)" },
-  reload:     { name: "Recarga",     vals: [10, 20, 35],     text: "-{v}% no tempo de recarga" },
-  endurance:  { name: "Fôlego",      vals: [10, 20, 35],     text: "-{v}% de energia gasta ao correr" },
-  metabolism: { name: "Metabolismo", vals: [10, 20, 35],     text: "-{v}% de fome e sede" },
-  vigor:      { name: "Vigor",       vals: [10, 25, 50],     text: "+{v} de vida máxima" },
-  regen:      { name: "Regeneração", vals: [0.15, 0.3, 0.6], text: "+{v} de vida por segundo (alimentado)" },
-  silence:    { name: "Abafador",    vals: [15, 30, 50],     text: "-{v}% de som e de visão dos zumbis" },
-  firepower:  { name: "Potência",    vals: [4, 8, 15],       text: "+{v}% de dano" },
-  thick:      { name: "Pele Grossa", vals: [3, 6, 10],       text: "-{v}% de dano recebido" },
-  greed:      { name: "Ganância",    vals: [5, 12, 25],      text: "+{v}% de dinheiro" },
-  agility:    { name: "Agilidade",   vals: [3, 6, 10],       text: "+{v}% de velocidade" },
-  saver:      { name: "Poupador",    vals: [5, 10, 18],      text: "{v}% de chance de não gastar bala" },
-  rage:       { name: "Desespero",       vals: [10, 20, 35],     text: "+{v}% de dano com menos de 40% de vida" },
-  killHeal:   { name: "Banquete", vals: [1, 2, 4], text: "+{v} de vida a cada abate" },
-  lootSense:  { name: "Faro",        vals: [300, 500, 800],  text: "mostra saques num raio de {v} no minimapa" },
-  luck:       { name: "Olho Clínico",       vals: [5, 10, 18],      text: "{v}% de chance de raridade maior nas armas" },
-  accImp:     { name: "Mira Firme",  vals: [10, 20, 35],     text: "-{v}% de dispersão dos tiros" },
-  stealthImp: { name: "Sombra",      vals: [5, 10, 18],      text: "+{v}% de chance de o zumbi não te ver" },
-  craftDisc:  { name: "Artesão",     vals: [8, 15, 25],      text: "-{v}% no preço da oficina" },
-  critDmg:    { name: "Sangue Frio", vals: [20, 40, 70],     text: "+{v}% de dano nos críticos" },
-  leech:      { name: "Vampiro",     vals: [2, 4, 7],        text: "{v}% do dano vira vida" },
-  adren:      { name: "Adrenalina",  vals: [8, 15, 25],      text: "+{v}% de velocidade com menos de 50% de vida" },
-  // Combos: um único nível, vários efeitos (alguns negativos)
-  rabbit:    { name: "Trevo de Natal", combo: true,
-               fx: { implantLoot: [100], greed: [900], hunter: [100], firepower: [-20], agility: [-10] },
-               text: "+100% chance de implantes · dinheiro x10 · +100% armas · -20% dano · -10% velocidade" },
-  berserker: { name: "Berserker", combo: true,
-               fx: { firepower: [30], crit: [8], thick: [-15], silence: [-30] },
-               text: "+30% dano · +8% crítico · +15% dano recebido · +30% de barulho" },
-  phantom:   { name: "Fantasma", combo: true,
-               fx: { silence: [40], agility: [8], endurance: [20], vigor: [-30] },
-               text: "-40% de som e visão · +8% velocidade · -20% energia gasta · -30 de vida máxima" },
-  hoarder:   { name: "Saqueador", combo: true,
-               fx: { scavenger: [30], hunter: [15], implantLoot: [30], agility: [-8], endurance: [-15] },
-               text: "+30% suprimentos · +15% armas · +30% implantes · -8% velocidade · +15% energia gasta" },
-  parasita:  { name: "Simbionte", combo: true,
-               fx: { firepower: [35], leech: [3], vigor: [-25] },
-               text: "+35% dano · 3% do dano vira vida · -25 de vida máxima" },
-  pele_x:    { name: "Couraça X", combo: true,
-               fx: { thick: [18], vigor: [20], agility: [-6] },
-               text: "-18% de dano recebido · +20 de vida máxima · -6% velocidade" },
-  furia_x:   { name: "Desespero X", combo: true,
-               fx: { rage: [50], critDmg: [30], thick: [-10] },
-               text: "+50% dano com pouca vida · +30% dano crítico · +10% dano recebido" },
-  coletor_x: { name: "Catador X", combo: true,
-               fx: { scavenger: [25], lootSense: [600], greed: [-15] },
-               text: "+25% suprimentos · faro de saque 600 · -15% de dinheiro" }
+  "rage", "killHeal", "lootSense", "luck", "accImp", "stealthImp", "craftDisc", "critDmg", "leech", "adren",
+  "armorFind", "ammoLoot", "searchSpeed", "miscFind", "lootSpots", "atkSpeed", "deathDefy", "bossRare", "mcChance", "pvpPoints"];
+const FX_LABEL = {
+  exp: "experiência", firepower: "dano causado", agility: "velocidade", thick: "redução do dano recebido",
+  hunter: "chance de achar armas", armorFind: "chance de achar coletes", ammoLoot: "munição achada", greed: "dinheiro achado",
+  searchSpeed: "velocidade de busca", miscFind: "chance de achar materiais", luck: "chance de itens raros",
+  lootSpots: "lugares com saque", scavenger: "chance de achar suprimentos", deathDefy: "chance de sobreviver a um golpe fatal",
+  bossRare: "chance de itens raros nos chefes", implantLoot: "chance de achar implantes",
+  mcChance: "chance de arma com melhorias", atkSpeed: "velocidade de ataque", pvpPoints: "pontos PvP"
 };
-for (const id in IMP) if (!IMP[id].combo) IMP[id].fx = { [id]: IMP[id].vals };
-const NEGTXT = { agility: "-{v}% de velocidade", thick: "+{v}% de dano recebido", vigor: "-{v} de vida máxima", reload: "+{v}% no tempo de recarga" };
-const TIER_COLOR = ["#9aa5a0", "#4aa3df", "#d4af37"];
-const SELL = [60, 200, 600];
+const IMP = {
+  "implante_01": {"name":"Urso de Ferro","price":1000,"scrap":29000,"kind":0,"fx":{"thick":10},"flag":"jugger","text":"Força Imparável: imune a atordoamento, agarrões e lentidão; massa +500%; derruba infectados comuns ao correr; redução total limitada a 80%."},
+  "implante_02": {"name":"Macaco Cibernético","price":3000,"scrap":29000,"kind":2,"mimic":true},
+  "implante_03": {"name":"Lobo Fantasma","price":1000,"scrap":29000,"kind":0,"fx":{"firepower":5,"agility":7}},
+  "implante_04": {"name":"Aracnídeo Mortal","price":750,"scrap":29000,"kind":0,"fx":{"implantLoot":200},"flag":"hook","text":"Acesso remoto à configuração dos implantes seguindo regras de instalação e remoção."},
+  "implante_05": {"name":"Águia Sombria","price":1000,"scrap":29000,"kind":0,"fx":{"firepower":8,"hunter":25,"searchSpeed":15}},
+  "implante_06": {"name":"Cobra Venenosa","price":1000,"scrap":29000,"kind":0,"fx":{"firepower":5,"agility":5,"atkSpeed":5}},
+  "implante_07": {"name":"Colmeia Mecânica","price":3000,"scrap":29000,"kind":2,"fx":{},"alloc":{"points":20,"opts":[{"key":"hunter","per":5},{"key":"armorFind","per":5},{"key":"ammoLoot","per":5},{"key":"greed","per":5},{"key":"searchSpeed","per":2},{"key":"miscFind","per":2}]}},
+  "implante_08": {"name":"Cérebro Supremo","price":1000,"scrap":29000,"kind":0,"fx":{"exp":14}},
+  "implante_09": {"name":"Olho do Predador","price":1000,"scrap":29000,"kind":0,"fx":{"firepower":5,"ammoLoot":30,"greed":30,"armorFind":20,"searchSpeed":15}},
+  "implante_10": {"name":"Coluna de Titânio","price":1000,"scrap":29000,"kind":0,"fx":{"exp":5,"firepower":7,"agility":4}},
+  "implante_11": {"name":"Coração de Ferro","price":800,"scrap":29000,"kind":0,"fx":{"exp":5,"pvpPoints":5,"agility":5,"deathDefy":25},"flag":"lastStand","text":"Última Resistência: ao atingir vida crítica, ignora penalidades de atributos do implante. Bônus PvP reservado para o sistema PvP."},
+  "implante_12": {"name":"Garras do Carniceiro","price":1100,"scrap":29000,"kind":2,"fx":{"bossRare":50,"searchSpeed":10},"alloc":{"points":10,"opts":[{"key":"firepower","per":1},{"key":"agility","per":1}]}},
+  "implante_13": {"name":"DNA Mutante","price":3000,"scrap":29000,"kind":2,"fx":{},"alloc":{"points":20,"opts":[{"key":"exp","per":1},{"key":"firepower","per":1},{"key":"agility","per":1},{"key":"thick","per":1}]}},
+  "implante_14": {"name":"Radar Fantasma","price":1000,"scrap":29000,"kind":0,"fx":{"luck":25,"lootSpots":7,"searchSpeed":7,"scavenger":7}},
+  "implante_15": {"name":"Processador de Guerra","price":1000,"scrap":29000,"kind":0,"fx":{"mcChance":100},"flag":"mc","text":"Obra-Prima: chance-base de armas melhoradas ×2; +2 melhorias nas armas e +6 em coletes Mastercraft, incluindo chefes."},
+  "implante_16": {"name":"Costelas de Aço","price":1000,"scrap":29000,"kind":0,"fx":{"exp":11,"firepower":1,"thick":1,"agility":1}},
+  "implante_17": {"name":"Fungo Parasita","price":1000,"scrap":29000,"kind":1,"fx":{"thick":-5,"atkSpeed":15}},
+  "implante_18": {"name":"Núcleo Tóxico","price":1000,"scrap":29000,"kind":0,"fx":{"firepower":11}},
+  "implante_19": {"name":"Bobina de Tesla","price":2000,"scrap":29000,"kind":1,"fx":{"firepower":30,"agility":-20}},
+  "implante_20": {"name":"Garras Infernais","price":1000,"scrap":62612,"kind":0,"fx":{"pvpPoints":20,"firepower":10},"text":"Bônus PvP reservado para o sistema PvP."},
+  "implante_21": {"name":"Abóbora Maldita","price":1000,"scrap":29000,"kind":0,"fx":{"exp":9,"firepower":6},"event":true},
+  "implante_22": {"name":"Caveira Vampírica","price":1000,"scrap":29000,"kind":0,"fx":{"exp":5,"thick":5,"agility":6},"event":true},
+  "implante_23": {"name":"Máscara da Folia","price":1000,"scrap":29000,"kind":0,"fx":{"exp":4,"firepower":4,"agility":4,"ammoLoot":12,"greed":12,"armorFind":12,"hunter":12},"event":true},
+  "implante_24": {"name":"Tambor do Caos","price":1000,"scrap":29000,"kind":0,"fx":{"agility":11},"event":true},
+  "implante_25": {"name":"Sinos do Apocalipse","price":2000,"scrap":29000,"kind":1,"fx":{"firepower":-20,"ammoLoot":100,"greed":100,"armorFind":100,"hunter":100},"event":true},
+  "implante_26": {"name":"Bengala Congelante","price":2000,"scrap":29000,"kind":1,"fx":{"exp":-20,"agility":30},"event":true},
+  "implante_27": {"name":"Ovo Radioativo","price":2000,"scrap":29000,"kind":1,"fx":{"exp":30,"thick":-25},"event":true},
+  "implante_28": {"name":"Coelho Mutante","price":1000,"scrap":29000,"kind":0,"fx":{"ammoLoot":27,"greed":33,"armorFind":27,"hunter":33},"event":true},
+  "implante_29": {"name":"Trindade Suprema","price":1000,"scrap":29000,"kind":0,"fx":{"exp":4,"firepower":6,"agility":5},"event":true},
+};
+const IMP_IDS = Object.keys(IMP);
+const IMP_COLOR = ["#d4af37", "#e07b5a", "#c58bff"];     // comum · com penalidade · especial
 
-// ---------- Personagem: nível (1 a 250) e atributos ----------
-const MAX_LEVEL = 250, ATTR_MAX = 200;
+// ---------- Personagem: nível (1 a 200) e atributos ----------
+const MAX_LEVEL = 200, ATTR_MAX = 100, PLAYER_HP_CAP = 200;
+// Limites de distribuição: stats gerais até 100, Força até 100,
+// e as cinco proficiências de armas até 120 cada (700 pontos no total).
+const WEAPON_SKILL_IDS = ["str", "melee", "pistols", "rifles", "shotguns", "machinegun"];
+function weaponSkillCap(id) {
+  if (id === "str") return 100;
+  return WEAPON_SKILL_IDS.includes(id) ? 120 : ATTR_MAX;
+}
+// 199 níveis ganhos = 665 pontos. Início: Força 25 + Melee 5 + Pistols 5 = 35.
+// Orçamento de arma até o nível 200: 35 + 665 = 700, antes de bônus da profissão.
+function weaponPointsAtLevel(level) {
+  const l = Math.min(MAX_LEVEL, Math.max(1, Math.floor(level)));
+  return Math.max(0, Math.min(l, 23) - 1) * 8 +
+    Math.max(0, Math.min(l, 50) - 23) * 7 +
+    Math.max(0, Math.min(l, 100) - 50) * 3 +
+    Math.max(0, Math.min(l, 150) - 100) * 2 +
+    Math.max(0, l - 150);
+}
+function weaponPointsForLevel(level) {
+  return weaponPointsAtLevel(level) - weaponPointsAtLevel(level - 1);
+}
+// Pontos de sobrevivência são uma reserva SEPARADA dos 700 de armas.
+function survivalPointsForLevel(level) {
+  return level <= 50 ? 3 : level <= 100 ? 2 : 1;
+}
 const ATTRS = [
-  { id: "str",        name: "Força",                 start: 10 },
-  { id: "armor",      name: "Armadura",              start: 10 },
-  { id: "agi",        name: "Agilidade",             start: 10 },
-  { id: "acc",        name: "Precisão de mira",      start: 10 },
-  { id: "crit",       name: "Chance de crítico",     start: 10 },
-  { id: "reload",     name: "Velocidade de recarga", start: 10 },
-  { id: "silence",    name: "Silêncio ao andar",     start: 10 },
-  { id: "stealth",    name: "Furtividade",           start: 1 },
-  { id: "melee",      name: "Melee",                 start: 20 },
-  { id: "pistols",    name: "Pistols",               start: 10 },
-  { id: "rifles",     name: "Rifles",                start: 10 },
-  { id: "shotguns",   name: "Shotguns",              start: 10 },
-  { id: "machinegun", name: "Machinegun",            start: 10 }
+  { id: "endurance", name: "Endurance (vida)", start: 25 },
+  { id: "str",        name: "Força",                 start: 25 },
+  { id: "armor",      name: "Armadura",              start: 0 },
+  { id: "agi",        name: "Agilidade",             start: 25 },
+  { id: "acc",        name: "Precisão de mira",      start: 25 },
+  { id: "crit",       name: "Chance de crítico",     start: 25 },
+  { id: "reload",     name: "Velocidade de recarga", start: 25 },
+  { id: "silence",    name: "Silêncio ao andar",     start: 0 },
+  { id: "stealth",    name: "Furtividade",           start: 0 },
+  { id: "melee",      name: "Melee",                 start: 5 },
+  { id: "pistols",    name: "Pistols",               start: 5 },
+  { id: "rifles",     name: "Rifles",                start: 0 },
+  { id: "shotguns",   name: "Shotguns",              start: 0 },
+  { id: "machinegun", name: "Machinegun",            start: 0 }
 ];
 const CATNAME = { melee: "Melee", pistols: "Pistols", rifles: "Rifles", shotguns: "Shotguns", machinegun: "Machinegun" };
 function defaultAttrs() { const a = {}; ATTRS.forEach((d) => { a[d.id] = d.start; }); return a; }
@@ -353,7 +370,11 @@ const CAPES = [
   { name: "Capa de couro", lvl: 15, color: "#3e2c20", trim: "#8a6a45" },
   { name: "Manto da noite", lvl: 30, color: "#1e2230", trim: "#6a7aa0" },
   { name: "Capa de guerra", lvl: 50, color: "#5a1a1a", trim: "#c9a040" },
-  { name: "Manto do sentinela", lvl: 80, color: "#d8d4c8", trim: "#4a4a4a" }
+  { name: "Manto do sentinela", lvl: 80, color: "#d8d4c8", trim: "#4a4a4a" },
+  { name: "Capa preta", lvl: 5, color: "#1c1c1f" },
+  { name: "Capa verde-escura", lvl: 10, color: "#25381f" },
+  { name: "Capa azul", lvl: 20, color: "#26457a" },
+  { name: "Capa branca", lvl: 25, color: "#c9c7bf" }
 ];
 
 // ---------- Créditos e VIP ----------

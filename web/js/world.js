@@ -35,7 +35,7 @@ function makeMap(seed) {
     for (let i = opts.length - 1; i > 0; i--) { const j = Math.floor(LR() * (i + 1)); [opts[i], opts[j]] = [opts[j], opts[i]]; }
     LANDMARKS[tier].forEach((t, i) => { if (opts[i]) opts[i].landmark = t; });
   }
-  MAP = { cells, bossT: 240000 };
+  MAP = { cells, bossT: 240000, bossRandom: mulberry(seed + 1234507) };
   for (let i = 0; i < BOSS_MAX; i++) placeBoss();
 }
 function cellAt(cx, cy) { return (MAP.cells[cy] && MAP.cells[cy][cx]) || null; }
@@ -48,11 +48,11 @@ function placeBoss() {
   if (!free.length) return null;
   // escolhe primeiro o chefe que está aparecendo menos, depois uma área da cor certa para ele
   const count = (id) => bossCells().filter((c) => c.boss === id).length;
-  const ids = Object.keys(BOSSES).sort((a, b) => count(a) - count(b) || Math.random() - 0.5);
+  const ids = Object.keys(BOSSES).sort((a, b) => count(a) - count(b) || a.localeCompare(b));
   for (const id of ids) {
     const opts = free.filter((c) => BOSSES[id].tiers.includes(c.tier));
     if (!opts.length) continue;
-    const c = pick(opts);
+    const c = opts[Math.floor(MAP.bossRandom() * opts.length)];
     c.boss = id; c.bossHp = null; c.cleared = false;
     return c;
   }
@@ -72,7 +72,7 @@ function makeArea(cell) {
   const wd = {
     cell, zone: cell.zone, obstacles: [], obs: new Grid(160), loot: new Grid(160), lootList: [], buildings: [], cars: [], lamps: [], trees: [],
     props: [], decals: [], blood: [], corpses: [], blocks: [], outposts: [], paths: [], fences: [], spaces: [], bodies: [], shells: [],
-    pop: false, wave1N: 0, opBlock: null
+    pop: false, wave1N: 0, opBlock: null, guards: []
   };
   const prev = world;
   world = wd;
@@ -82,6 +82,18 @@ function makeArea(cell) {
   }
   genStreets(wd, R);
   genBodies(wd, R);
+  if (typeof genScenery === "function") genScenery(wd); else wd.models = [];   // cenário 3D (models.js)
+  // Reaplica saques ao reconstruir a área, inclusive novos cadáveres
+  // decorativos. Índices antigos permanecem iguais; os novos são anexados.
+  if (Array.isArray(cell._savedLoot)) {
+    wd.lootList.forEach((loot, i) => {
+      if (cell._savedLoot[i]) {
+        loot.opened = true;
+        loot.openedAt = 0;
+      }
+    });
+    cell._savedLoot = null;
+  }
   wd.mini = buildMinimap(wd);
   world = prev || wd;
   return wd;
@@ -289,6 +301,7 @@ function genOutpost(wd, blk, inner, op, R) {
   wd.outposts[op.id] = b;
   // cerca com portão virado para o sul
   const f = { x: inner.x + 22, y: inner.y + 22, w: inner.w - 44, h: inner.h - 44 }, t = 8, gate = 150, gx = bx + bw / 2;
+  installBaseGuards(wd, op, f);
   fence(wd, f.x, f.y, f.w, t);
   fence(wd, f.x, f.y, t, f.h);
   fence(wd, f.x + f.w - t, f.y, t, f.h);
@@ -308,7 +321,7 @@ function genBodies(wd, R) {
   for (let i = 0; i < n; i++) for (let t = 0; t < 25; t++) {
     const x = 40 + R() * (WORLD_W - 80), y = 40 + R() * (WORLD_H - 80);
     if (!free(wd, x - 14, y - 14, 28, 28, 6) || inOpBlock(wd, x, y)) continue;
-    const o = { x: x - 14, y: y - 14, w: 28, h: 28, kind: "body", table: "body", name: "Corpo de sobrevivente", ang: R() * 6.283,
+    const o = { x: x - 14, y: y - 14, w: 28, h: 28, kind: "body", table: "body", name: "Zumbi caído", ang: R() * 6.283,
       cloth: pick(CL, R), pants: pick(["#2e3a4a", "#3a3226", "#2a2a2a", "#4a4a32"], R), skin: pick(["#c9a07a", "#a07850", "#d8b08a", "#7a5a3a"], R), bag: R() < 0.5 };
     wd.bodies.push(o);
     if (R() < lootChance) lootable(wd, o); else o.opened = true;
@@ -336,18 +349,55 @@ function genStreets(wd, R) {
   const [hy0, hy1] = H_STREETS[1], [vx0, vx1] = V_STREETS[1];
   const nh = 2 + Math.floor(R() * 3);
   for (let i = 0; i < nh; i++) for (let t = 0; t < 15; t++) {
-    const w = 78, h = 38, x = AREA_EDGE + R() * (WORLD_W - 2 * AREA_EDGE - w), y = hy0 + 18 + R() * (ST_W - h - 36);
-    if (!free(wd, x, y, w, h, 34)) continue;
+    const w = 128, h = 62, x = AREA_EDGE + R() * (WORLD_W - 2 * AREA_EDGE - w);
+    // Veículos abandonados no acostamento, perto do meio-fio, nunca
+    // atravessados no centro da avenida. Mantém a semente por setor.
+    const lane = R();
+    const y = lane < 0.5 ? hy0 + 6 + lane * 14 : hy1 - h - 6 - (lane - 0.5) * 14;
+    if (!free(wd, x, y, w, h, 24)) continue;
     addCar(wd, x, y, w, h, false, R); break;
   }
   const nv = 1 + Math.floor(R() * 3);
   for (let i = 0; i < nv; i++) for (let t = 0; t < 15; t++) {
-    const w = 38, h = 78, x = vx0 + 14 + R() * (ST_W - w - 28), y = AREA_EDGE + R() * (WORLD_H - 2 * AREA_EDGE - h);
-    if (!free(wd, x, y, w, h, 30)) continue;
+    const w = 62, h = 128, lane = R(), y = AREA_EDGE + R() * (WORLD_H - 2 * AREA_EDGE - h);
+    // Mesmo alinhamento junto ao meio-fio nas vias verticais.
+    const x = lane < 0.5 ? vx0 + 6 + lane * 14 : vx1 - w - 6 - (lane - 0.5) * 14;
+    if (!free(wd, x, y, w, h, 24)) continue;
     addCar(wd, x, y, w, h, true, R); break;
   }
-  for (let x = 120; x < WORLD_W; x += 330) wd.lamps.push({ x, y: hy0 + 6 }, { x: x + 165, y: hy1 - 6 });
-  for (let y = 120; y < WORLD_H; y += 330) wd.lamps.push({ x: vx0 + 6, y }, { x: vx1 - 6, y: y + 165 });
+  // Iluminação pública exclusivamente na calçada (faixa de concreto das
+  // quadras). Evita postes no meio da pista e também remove os antigos
+  // postes gerados dentro de pátios de bases e pontos de interesse.
+  // Preserve luminárias de bases e pontos especiais; adicione as públicas
+  // nas calçadas externas E internas, nunca no asfalto.
+  wd.lamps = wd.lamps || [];
+  const lampSpacing = 66;
+  const addSidewalkLamp = (x, y) => {
+    if (!wd.blocks.some(b => x >= b.x && y >= b.y && x <= b.x + b.w && y <= b.y + b.h &&
+      (x < b.x + SIDEWALK || x > b.x + b.w - SIDEWALK ||
+       y < b.y + SIDEWALK || y > b.y + b.h - SIDEWALK))) return;
+    if (!free(wd, x - 4, y - 4, 8, 8, 4)) return;
+    if (wd.lamps.some(l => Math.hypot(l.x - x, l.y - y) < lampSpacing)) return;
+    wd.lamps.push({ x, y, big: true });
+  };
+  for (const b of wd.blocks) {
+    const s = SIDEWALK / 2;
+    // Calçadas voltadas à avenida central (inalterada em 140 unidades).
+    const innerY = b.i < 2 ? b.y + b.h - s : b.y + s;
+    const innerX = (b.i % 2) === 0 ? b.x + b.w - s : b.x + s;
+    for (const f of [0.27, 0.73]) {
+      addSidewalkLamp(b.x + b.w * f, innerY);
+      addSidewalkLamp(innerX, b.y + b.h * f);
+    }
+    // Calçadas voltadas às QUATRO ruas laterais de 150 unidades.
+    // Três postes espaçados por lado, inclusive no norte/sul/leste/oeste.
+    const outerY = b.i < 2 ? b.y + s : b.y + b.h - s;
+    const outerX = (b.i % 2) === 0 ? b.x + s : b.x + b.w - s;
+    for (const f of [0.18, 0.50, 0.82]) {
+      addSidewalkLamp(b.x + b.w * f, outerY);
+      addSidewalkLamp(outerX, b.y + b.h * f);
+    }
+  }
   for (let i = 0; i < 160; i++) {
     const x = R() * WORLD_W, y = R() * WORLD_H;
     if (blockAt(x, y, wd)) continue;
@@ -390,6 +440,18 @@ function darkness() {
   return 0.82 - ((h - 4.5) / 2.5) * 0.74;
 }
 function isNight() { return darkness() > 0.5; }
+ // Intensidade da luz solar: aurora gradual, sol quente entre manhã/tarde,
+ // pôr do sol suave. Mesmo relógio global para todos os jogadores.
+function sunIntensity() {
+  const h = ((game.clock / 60) % 24 + 24) % 24;
+  if (h < 5.5 || h >= 19) return 0;
+  if (h < 8) return (h - 5.5) / 2.5;
+  if (h < 16) return 1;
+  return (19 - h) / 3;
+}
+// A lanterna NÃO fica acesa sob a luz do dia (inclusive no sprite).
+function flashlightActive() { return isNight(); }
+
 
 // ---------- Zumbis da área ----------
 function walkable(x, y, r) {
@@ -412,6 +474,7 @@ function activateArea() {
   const cell = world.cell;
   if (world.pop) return;
   world.pop = true;
+  if (typeof fmWorld !== "undefined" && fmWorld.isFollower()) { fmWorld.requestSync(); return; }
   for (const o of world.lootList) if (o.opened && game.time - o.openedAt > 300000) o.opened = false; // saques voltam depois de 5 min
   const z = cell.zone, reg = regionOf(z), frac = clamp((game.time - cell.leftAt) / 90000, 0.25, 1);
   let n = Math.round(Math.min(18, z === 0 ? 5 : 7 + (z % REGION_ROWS) * 1.2 + reg * 1.1) * REGIONS[reg].spawn * frac * (isNight() ? 1.25 : 1));
@@ -434,8 +497,10 @@ function activateArea() {
 }
 // ao matar a primeira leva da área do chefe, o surgimento de zumbis cai 30%
 function mapTick(dt) {
-  MAP.bossT -= dt;
-  if (MAP.bossT <= 0) {
+  // Chefes iniciais seguem uma semente comum. Não se criam novos chefes
+  // aleatórios por navegador durante o multiplayer.
+  if (typeof fmWorld === "undefined") MAP.bossT -= dt;
+  if (typeof fmWorld === "undefined" && MAP.bossT <= 0) {
     MAP.bossT = 240000;
     if (bossCells().length < BOSS_MAX) {
       const c = placeBoss();
@@ -493,16 +558,6 @@ function gotoCell(cell, pos) {
   resetRows();
   if (!cell.w) cell.w = makeArea(cell);
   world = cell.w;
-  // Reaplica os saques já abertos em áreas visitadas antes de fechar o jogo.
-  if (Array.isArray(cell._savedLoot)) {
-    world.lootList.forEach((item, index) => {
-      if (index < cell._savedLoot.length) {
-        item.opened = !!cell._savedLoot[index];
-        item.openedAt = item.opened ? game.time : 0;
-      }
-    });
-    cell._savedLoot = null;
-  }
   cell.visited = true;
   game.inside = null;
   const p = typeof pos === "function" ? pos(world) : pos;
