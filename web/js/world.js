@@ -129,7 +129,7 @@ function addTree(wd, x, y, r, R) {
 function addCar(wd, x, y, w, h, vert, R) {
   const color = pick(CAR_COLORS, R), wreck = R() < 0.25;
   const car = { x, y, w, h, vert, color, wreck, c1: shade(color, wreck ? -0.55 : 0), c2: shade(color, wreck ? -0.45 : 0.12),
-    rot: (R() - 0.5) * 0.12, dir: R() < 0.5, kind: "car", table: "car", name: "Carro", searchable: R() < 0.1 };
+    rot: (R() - 0.5) * (wreck ? 0.16 : 0.05), dir: R() < 0.5, kind: "car", table: "car", name: "Carro", searchable: R() < 0.1 };
   car.explosive = !wreck && R() < 0.17; car.chp = 160;
   solid(wd, car, false);
   if (car.searchable) lootable(wd, car);
@@ -251,7 +251,7 @@ function genParking(wd, blk, inner, R) {
   for (const y of rowsY) for (let i = 0; i < n; i++) {
     const x = x0 + i * sw;
     wd.spaces.push({ x, y, w: sw, h: sd });
-    if (R() < 0.5) addCar(wd, x + 6, y + 4, 38, 76, true, R);
+    if (R() < 0.5) addCar(wd, x + 5, y + 1, 40, 82, true, R);
   }
   placeBuilding(wd, blk, { x: inner.x, y: inner.y, w: inner.w, h: inner.h, facing: "up" }, "guarita", R,
     { x: inner.x + inner.w - 66, y: inner.y + inner.h / 2 - 24, w: 52, h: 48 });
@@ -290,7 +290,7 @@ function genLandmark(wd, blk, inner, type, R) {
   } else if (type === "prisao") {
     wd.props.push({ type: "flag", x: b.x - 26, y: b.y + 20 });
   } else {
-    for (let i = 0; i < 3; i++) addCar(wd, inner.x + 40 + i * 70, b.y + b.h + 70, 38, 76, true, R);
+    for (let i = 0; i < 3; i++) addCar(wd, inner.x + 40 + i * 70, b.y + b.h + 70, 40, 82, true, R);
   }
 }
 
@@ -347,23 +347,32 @@ function sidewalkTrash(wd, blk, R) {
 // As ruas da borda ficam livres para você passar de uma área para outra.
 function genStreets(wd, R) {
   const [hy0, hy1] = H_STREETS[1], [vx0, vx1] = V_STREETS[1];
+  // Carros abandonados estacionados junto ao meio-fio, no sentido da mão (mão direita, como no
+  // Brasil), às vezes em fila de 2 ou 3. Tamanho de carro de verdade: ~4,4 m x 1,9 m (MODEL_K px/m).
+  const CL = 92, CW = 40, GAP = 14;
   const nh = 2 + Math.floor(R() * 3);
   for (let i = 0; i < nh; i++) for (let t = 0; t < 15; t++) {
-    const w = 128, h = 62, x = AREA_EDGE + R() * (WORLD_W - 2 * AREA_EDGE - w);
-    // Veículos abandonados no acostamento, perto do meio-fio, nunca
-    // atravessados no centro da avenida. Mantém a semente por setor.
-    const lane = R();
-    const y = lane < 0.5 ? hy0 + 6 + lane * 14 : hy1 - h - 6 - (lane - 0.5) * 14;
-    if (!free(wd, x, y, w, h, 24)) continue;
-    addCar(wd, x, y, w, h, false, R); break;
+    const top = R() < 0.5, n = 1 + Math.floor(R() * R() * 3);
+    const run = n * CL + (n - 1) * GAP, x = AREA_EDGE + R() * (WORLD_W - 2 * AREA_EDGE - run);
+    const y = top ? hy0 + 8 + R() * 4 : hy1 - CW - 8 - R() * 4;
+    if (!free(wd, x, y, run, CW, 24)) continue;
+    for (let j = 0; j < n; j++) {
+      const c = addCar(wd, x + j * (CL + GAP) + (R() - 0.5) * 6, y + (R() - 0.5) * 3, CL, CW, false, R);
+      c.dir = top;                                                     // em cima vai para a esquerda
+    }
+    break;
   }
   const nv = 1 + Math.floor(R() * 3);
   for (let i = 0; i < nv; i++) for (let t = 0; t < 15; t++) {
-    const w = 62, h = 128, lane = R(), y = AREA_EDGE + R() * (WORLD_H - 2 * AREA_EDGE - h);
-    // Mesmo alinhamento junto ao meio-fio nas vias verticais.
-    const x = lane < 0.5 ? vx0 + 6 + lane * 14 : vx1 - w - 6 - (lane - 0.5) * 14;
-    if (!free(wd, x, y, w, h, 24)) continue;
-    addCar(wd, x, y, w, h, true, R); break;
+    const left = R() < 0.5, n = 1 + Math.floor(R() * R() * 3);
+    const run = n * CL + (n - 1) * GAP, y = AREA_EDGE + R() * (WORLD_H - 2 * AREA_EDGE - run);
+    const x = left ? vx0 + 8 + R() * 4 : vx1 - CW - 8 - R() * 4;
+    if (!free(wd, x, y, CW, run, 24)) continue;
+    for (let j = 0; j < n; j++) {
+      const c = addCar(wd, x + (R() - 0.5) * 3, y + j * (CL + GAP) + (R() - 0.5) * 6, CW, CL, true, R);
+      c.dir = left;                                                    // à esquerda desce a rua
+    }
+    break;
   }
   // Iluminação pública exclusivamente na calçada (faixa de concreto das
   // quadras). Evita postes no meio da pista e também remove os antigos

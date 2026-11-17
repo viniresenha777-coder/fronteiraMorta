@@ -48,85 +48,48 @@ function modelRect(id, gx, gy, k) {
   const d = PROP_SPR[id]; k = k || MODEL_K;
   return { x: gx - d.fw * k / 2, y: gy - d.fd * k / 2, w: d.fw * k, h: d.fd * k };
 }
-// Oito carros REAIS renderizados a partir dos modelos 3D fornecidos:
-// 4 Zhiguli soviéticos + 4 carros destruídos. As posições, colisões,
-// explosões e pontos de loot seguem usando os objetos originais do mapa.
-const FM_CAR_ART = new Image();
-FM_CAR_ART.src = "img/fm_cars_3d_atlas.webp?v=20261117-cars1";
-const FM_CAR_CELL_W = 320, FM_CAR_CELL_H = 270;
+// Carros das ruas: modelos 3D fotografados no Blender na mesma projeção do cenário
+// (fronteiraMorta_src/blender/cars.py), cada um em 4 direções: car_<n>_<giro>.png em img/props.
+// Assim o carro fica reto na rua, com o teto e as laterais na perspectiva da câmera, sem girar
+// a imagem (girar uma foto 3/4 é o que deixava os carros tortos e "colados" no asfalto).
+// 0-3: Zhiguli inteiros (vermelho, verde, azul, branco) · 4, 5, 7: destroçados.
+const CAR_WHOLE = [0, 1, 2, 3], CAR_WRECK = [4, 5, 7];
+function carHash(c) {
+  return (Math.imul(Math.floor(c.x * 7.13), 73856093) ^ Math.imul(Math.floor(c.y * 3.71), 19349663)) >>> 0;
+}
 function carVariant(c) {
-  const h = (Math.imul(Math.floor(c.x * 7.13), 73856093) ^
-    Math.imul(Math.floor(c.y * 3.71), 19349663)) >>> 0;
-  // Carros já destruídos ou incendiados sempre usam um modelo de sucata.
-  return c.burnt || c.wreck || c.chp <= 0 ? 4 + (h % 4) : h % 4;
+  const h = carHash(c), list = c.burnt || c.wreck || c.chp <= 0 ? CAR_WRECK : CAR_WHOLE;
+  return list[h % list.length];
 }
-function carModel(c) { return "fm_car_" + carVariant(c); }
-// Limites reais (alpha > 40) de cada arte dentro do atlas 320 x 270.
-// Os carros anteriores eram desenhados ~2,5x mais largos que a hitbox.
-// Essas frações alinham a carroceria visível ao retângulo físico do mapa.
-const FM_CAR_BOUNDS = [
-  [216/320,240/270],[216/320,240/270],[222/320,240/270],[216/320,240/270],
-  [290/320,213/270],[290/320,203/270],[259/320,240/270],[209/320,240/270]
-];
-function carSpriteGeometry(c, id) {
-  const [visibleW,visibleH] = FM_CAR_BOUNDS[id];
-  // O atlas é vertical no seu eixo local; girá-lo 90° nos veículos
-  // estacionados na horizontal preserva a orientação da colisão.
-  const cross = c.vert ? c.w : c.h;
-  const length = c.vert ? c.h : c.w;
-  return {
-    angle: (c.vert ? 0 : Math.PI / 2) + (c.dir ? Math.PI : 0) + (c.rot || 0),
-    drawW: cross * 0.93 / visibleW,
-    drawH: length * 0.96 / visibleH,
-    cross, length
-  };
-}
+// direção do carro: horizontal = frente para a direita (0) ou esquerda (180); vertical = para cima (90) ou baixo (270)
+function carYaw(c) { return c.vert ? (c.dir ? 270 : 90) : (c.dir ? 180 : 0); }
+function carModel(c) { return `car_${carVariant(c)}_${carYaw(c)}`; }
 function drawCarModel(c) {
-  if (!FM_CAR_ART.complete || !FM_CAR_ART.naturalWidth) {
-    drawCar(c); // fallback até o atlas carregar
-    return true;
-  }
-  const id = carVariant(c), g = carSpriteGeometry(c, id), active = lootSpotActive(c);
+  const id = carModel(c);
+  if (!modelOk(id) || !modelImg(id)) { drawCar(c); return true; }      // até a imagem carregar
+  const d = PROP_SPR[id], active = lootSpotActive(c);
   const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
-
-  // Primeiro a sombra de contato NO CHÃO, centrada na hitbox. Ela não
-  // é uma sombra projetada e não participa de física nem de tiros.
-  ctx.save();
-  ctx.translate(cx, cy + 3);
-  ctx.rotate(g.angle);
-  const shadow = ctx.createRadialGradient(0, 0, 1, 0, 0, g.length * .62);
-  shadow.addColorStop(0, "rgba(4,7,7,0.37)");
-  shadow.addColorStop(.62, "rgba(5,8,7,0.24)");
-  shadow.addColorStop(1, "rgba(5,8,7,0)");
-  ctx.fillStyle = shadow;
-  ctx.beginPath(); ctx.ellipse(0,0,g.cross*.56,g.length*.59,0,0,6.283);ctx.fill();
-  ctx.restore();
-
+  // o carro ocupa o retângulo de colisão inteiro (mesma escala nas duas direções)
+  const k = Math.min(c.w / d.fw, c.h / d.fd);
+  // sombra de contato no chão, um pouco para baixo e à direita (luz do cenário vem de cima à esquerda)
+  ctx.fillStyle = "rgba(0,0,0,0.30)";
+  ellipse(cx + 3, cy + 4, d.fw * k * 0.54, d.fd * k * 0.6);
   if (active) {
-    ctx.save();
-    const glow = ctx.createRadialGradient(cx,cy,5,cx,cy,g.length*.73);
-    glow.addColorStop(0,"rgba(255,215,101,0.20)");
-    glow.addColorStop(1,"rgba(255,205,94,0)");
-    ctx.fillStyle=glow;
-    ctx.beginPath();ctx.arc(cx,cy,g.length*.73,0,6.283);ctx.fill();
-    ctx.restore();
+    const glow = ctx.createRadialGradient(cx, cy, 5, cx, cy, Math.max(c.w, c.h) * 0.75);
+    glow.addColorStop(0, "rgba(255,215,101,0.20)");
+    glow.addColorStop(1, "rgba(255,205,94,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(c.w, c.h) * 0.75, 0, 6.283); ctx.fill();
   }
+  const s = k / d.ppm, im = modelImg(id);
   ctx.save();
-  // Apenas 2px de assentamento visual para casar as rodas com o asfalto.
-  ctx.translate(cx, cy + 2);
-  ctx.rotate(g.angle);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  if (active) {
-    ctx.shadowColor = "rgba(255,221,130,.43)";
-    ctx.shadowBlur = 5;
-    ctx.filter = "brightness(1.12) contrast(1.06)";
-  } else if (c.burnt) ctx.filter = "brightness(.83) contrast(1.10)";
-  ctx.drawImage(FM_CAR_ART,
-    (id % 4) * FM_CAR_CELL_W, Math.floor(id / 4) * FM_CAR_CELL_H,
-    FM_CAR_CELL_W,FM_CAR_CELL_H,-g.drawW/2,-g.drawH/2,g.drawW,g.drawH);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  if (c.rot) { ctx.translate(cx, cy); ctx.rotate(c.rot); ctx.translate(-cx, -cy); }   // estacionado meio torto
+  if (active) ctx.filter = "brightness(1.12) contrast(1.06)";
+  else if (c.burnt) ctx.filter = "brightness(.55) saturate(.4) contrast(1.1)";
+  ctx.drawImage(im, cx - d.cx * s, cy - d.cy * s, d.w * s, d.h * s);
   ctx.restore();
-  if (active) drawLootQuestion(c,cx,c.y-15);
+  if (active) drawLootQuestion(c, cx, c.y - 15);
   return true;
 }
 function drawDumpsterModel(o) {
