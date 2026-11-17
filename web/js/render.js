@@ -785,6 +785,7 @@ function drawFurnitureBase(f) {
   // móveis com modelo 3D (models.js): ocupam o mesmo lugar no chão
   const mid = typeof FURN_MODEL !== "undefined" && FURN_MODEL[n];
   if (mid && modelOk(mid)) {
+    const active = lootSpotActive(f) && (f.kind === "furniture" || f.kind === "chest");   // mesmo destaque amarelo de drawFurniture
     const d = PROP_SPR[mid], k = Math.min(w / d.fw, h / d.fd) * 1.05;
     if (drawModel(mid, x + w / 2, y + h / 2, k, active ? LOOT_YELLOW_FILTER : f.opened ? "brightness(0.7)" : null)) { ctx.globalAlpha = 1; return; }
   }
