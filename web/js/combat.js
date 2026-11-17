@@ -401,10 +401,12 @@ function killZombie(z) {
   game.score += Math.round(10 * zx);
   gainXp((8 + 1.5 * z.zone) * zx);
   // zumbi morto não deixa saque: o corpo fica um pouco e some
-  if (Math.random() < 0.5) {
+  // zumbi com sprite 3D: sempre cai no chão (animação de queda) e o corpo fica deitado um tempo
+  const dz = typeof zombieDeathInfo === "function" ? zombieDeathInfo(z) : null;
+  if (dz || Math.random() < 0.5) {
     const s = z.r * 2;
-    corpses.push({ x: z.x - s / 2, y: z.y - s / 2, w: s, h: s, kind: "corpse", table: "corpse", name: "Corpo", opened: true,
-      life: 15000, ang: Math.random() * 3, skin: z.skin, cloth: z.cloth });
+    corpses.push(Object.assign({ x: z.x - s / 2, y: z.y - s / 2, w: s, h: s, kind: "corpse", table: "corpse", name: "Corpo", opened: true,
+      life: dz ? 20000 : 15000, ang: Math.random() * 3, skin: z.skin, cloth: z.cloth }, dz || {}));
     if (corpses.length > 30) { const i = corpses.findIndex((c) => c.table !== "boss"); if (i >= 0) corpses.splice(i, 1); }
   }
 }

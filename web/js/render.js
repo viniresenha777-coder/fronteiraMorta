@@ -462,6 +462,7 @@ function drawCorpse(c) {
   }
 }
 function drawCorpseBase(c) {
+  if (c.dsheet && typeof drawZombieDeath === "function" && drawZombieDeath(c)) return;
   ctx.save(); ctx.translate(c.x + c.w / 2, c.y + c.h / 2); ctx.rotate(c.ang);
   const s = c.w / 26;
   ctx.fillStyle = "rgba(80,6,6,0.5)"; ellipse(2, 2, 19 * s, 13 * s);

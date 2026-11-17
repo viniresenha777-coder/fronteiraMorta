@@ -538,6 +538,38 @@ function zombieSheet(z) {
     default: return null;
   }
 }
+// ---------- Morte: queda e corpo no chão ----------
+// img/<nome>_death.png: 8 direções x 8 quadros de 256 px (o dobro do quadro de andar, mesma escala:
+// cobre 4 m em vez de 2 m) com o pé no meio do quadro. O último quadro é o corpo deitado.
+const ZDEATH = {};
+function zombieDeathImg(nm) {
+  let im = ZDEATH[nm];
+  if (!im) { im = ZDEATH[nm] = new Image(); im.onerror = () => { im.bad = true; }; im.src = `img/${nm}_death.png?v=20261117-morte01`; }
+  return im.bad || !im.complete || !im.naturalWidth ? null : im;
+}
+// dados que o corpo guarda ao morrer (null = zumbi sem sprite 3D, usa o boneco antigo)
+function zombieDeathInfo(z) {
+  if (!ZSHEET.ok || save.classicChar || z.boss) return null;
+  const nm = zombieSheet(z); if (!nm) return null;
+  zombieDeathImg(nm);
+  return { dsheet: nm, drow: sheetRow(Math.cos(z.angle), Math.sin(z.angle)), dS: zSpriteSize(z, nm), fx: z.x, fy: z.y, t0: game.time,
+    dfilter: z.type === "toxic" ? "hue-rotate(55deg) saturate(1.5)" : z.type === "infected" ? "brightness(0.8) contrast(1.15)" : null };
+}
+function drawZombieDeath(c) {
+  const im = zombieDeathImg(c.dsheet);
+  if (!im) return false;
+  const el = game.time - c.t0, col = el < 0 ? 7 : Math.min(7, Math.floor(el / 70));   // queda em ~0,5 s
+  const S = c.dS * 2, x = c.fx - S / 2, y = c.fy - S * 0.5;
+  ctx.save();
+  if (col === 7) {                                     // poça de sangue embaixo do corpo
+    ctx.fillStyle = "rgba(70,5,5,0.35)"; ellipse(c.fx, c.fy, c.dS * 0.22, c.dS * 0.16);
+  }
+  if (c.life < 2000) ctx.globalAlpha = Math.max(0, c.life / 2000);   // some aos poucos no fim
+  if (c.dfilter) ctx.filter = c.dfilter;
+  ctx.drawImage(im, col * 256, c.drow * 256, 256, 256, x, y, S, S);
+  ctx.restore();
+  return true;
+}
 // tamanho do quadro na tela: todos os modelos 3D foram fotografados na mesma escala
 function zSpriteSize(z, nm) {
   if (nm === "z_dog") return ZSHEET.base * (z.r / 11);
